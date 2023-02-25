@@ -1,0 +1,11 @@
+SimulationDir           ./obs_files
+SimulationLabel         test_base
+NumberOfSimulations     2
+NumberOfPoints          6556
+SamplingPeriod          1.0
+TimeNoiseStart          1000
+NoiseModels             Matern
+GGM_1mphi               6.9e-06
+RepeatableNoise         yes
+#TS_format               mom
+#AnnualSignal            0

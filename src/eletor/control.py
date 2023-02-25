@@ -82,12 +82,12 @@ class ControlClass:
         Args:
             ctl_file (string) : name of text-file with parameters
         Oprional Args:
-            defaults : dictionary of labels:(defaultValue,validValues,comments)
+            defaults : dictionary of labels:defaultValue
                        for mandatory arguments.
                        Defaults for mandatory arguments will not be used unless
                        explicitly asked by de user or by passing the unatended
                        flag, in which case a warning will be logged.
-            opt_defaults : dictionary of labels:(defaultValue,validValues,comments)
+            opt_defaults : dictionary of labels:defaultValue
                            for optional argumens
 
         ** ValidValues and comments are ignored in this version, planed for
@@ -205,15 +205,15 @@ class ControlClass:
 
         with open(fname,'w') as f:
             for k,v in defaults.items():
-                if isinstance(v[0],bool):
-                    if v[0]:
+                if isinstance(v,bool):
+                    if v:
                         v = 'Yes'
                     else:
                         v = 'No'
-                elif v[0] is None:
+                elif v is None:
                     v = ''
                 else:
-                    v = v[0]
+                    v = v
                 print(f'{k:20s}{v}', file=f)
 
         raise FileNotFoundError(2,"File not found, Created:",fname)
@@ -225,10 +225,10 @@ class ControlClass:
         elif parameter in self.defaults:
             p = self.defaults[parameter]
             if p is None:
-                raise ValueError(f"Parameter f{parameter} is mandatory and has no default value")
+                raise ValueError(f"Parameter {parameter} is mandatory and has no default value")
 
             elif self.unatended or \
-                 (input(f'Parameter f{parameter} is mandatory, use default value of <{p}>? [y/N]: ')\
+                 (input(f'Parameter {parameter} is mandatory, use default value of <{p}>? [y/N]: ')\
                   in ('y','Y')):
                 return p
 

@@ -208,12 +208,13 @@ def check_kappa(control):
                 # kappa = float(input())
                 control.get('Kappa')[ix] = MustAsk
 
-            if (nm in ['Powerlaw', 'GGM']) and (kappa<-2.0-EPS or kappa>2.0+EPS):
-                raise ValueError('kappa shoud lie between -2 and 2 : {0:f}'.format(kappa))
-            elif nm == 'Matern' and (kappa > -0.5):
-                # The cited paper on Matern processes limits alfa to > 0.5,
-                # implying this.
-                raise ValueError('kappa shoud be lower than -0.5 : {0:f}'.format(kappa))
+            else:
+                if (nm in ['Powerlaw', 'GGM']) and (kappa<-2.0-EPS or kappa>2.0+EPS):
+                    raise ValueError('kappa shoud lie between -2 and 2 : {0:f}'.format(kappa))
+                elif nm == 'Matern' and (kappa > -0.5):
+                    # The cited paper on Matern processes limits alfa to > 0.5,
+                    # implying this.
+                    raise ValueError('kappa shoud be lower than -0.5 : {0:f}'.format(kappa))
 
 def check_lambda(control):
     """
@@ -243,8 +244,7 @@ def check_lambda(control):
                 # print(f'Please Specify Lambda Parameter for model <{ix}:{nm}> : ', end='')
                 # lamba = float(input())
                 control.get('Lambda')[ix] = MustAsk
-
-            if (lamba < EPS):
+            elif (lamba < EPS):
                 # The cited paper on Matern processes limits lambda to be
                 # positive
                 raise ValueError(f'Lambda should be positive : {lamba:f}')
@@ -324,21 +324,21 @@ def check_NoiseModel_islist(control):
 
 
 control_defaults = {
-        'SimulationDir':(None,),
-        'SimulationLabel':(None,),
+        'SimulationDir':None,
+        'SimulationLabel':None,
         'TS_format':'mom',
-        'NumberOfSimulations':(1,),
-        'NumberOfPoints':(365,),
-        'SamplingPeriod':(1,),
-        'TimeNoiseStart':(0,),
-        'NoiseModels':(None,),
-        'RepeatableNoise':(False,),
-        'MissingData':(False,),
-        'PercMissingData':(0.0,),
-        'Offsets':(False,),
-        'Trend':(0,),
-        'NominalBias':(0,),
-        'AnnualSignal':(0,)}
+        'NumberOfSimulations':1,
+        'NumberOfPoints':365,
+        'SamplingPeriod':1,
+        'TimeNoiseStart':0,
+        'NoiseModels':None,
+        'RepeatableNoise':False,
+        'MissingData':False,
+        'PercMissingData':0.0,
+        'Offsets':False,
+        'Trend':0,
+        'NominalBias':0,
+        'AnnualSignal':0}
 
 hooks = [
         check_MissingData,
@@ -584,3 +584,5 @@ def main():
 
     simulate_noise(control,observations)
 
+if __name__ == "__main__":
+    exit(main())
