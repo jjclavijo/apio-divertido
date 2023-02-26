@@ -191,27 +191,6 @@ def test_noise_compare_GGM(monkeypatch,m,sigma,kappa,one_minus_phi,dt):
     myio.close()
 
     # --- Real test starts here ---
-     
-    #options = {
-    #           'SimulationDir':'None',
-    #           "SimulationLabel":'None',
-    #           "NumberOfSimulations":1,
-    #           "NumberOfPoints":m,
-    #           "SamplingPeriod":dt,
-    #           "TimeNoiseStart":0,
-    #           "TS_format":'mom',
-    #           "GGM_1mphi":one_minus_phi,
-    #           'NoiseModels': ["GGM"],
-    #           "Kappa": [kappa],
-    #           "Sigma": [sigma]
-    #            }
-
-    #mparams = mock.Mock(side_effect = options.__getitem__)
-    #mm = mock.MagicMock(**{"params.__getitem__":mparams,"__getitem__":mparams,"get":mparams})
-    #cm = mock.Mock(return_value = mm)
-    #mdir = mock.Mock()
-
-    #control = hps.simulatenoiseControl(options,)
     toml_string = f"""
 [file_config]
 SimulationDir=""
@@ -234,6 +213,7 @@ dt={dt} # Sampling period
 spectral_density=0.01
 units="mom" # TS-format
 """
+
     control_data = toml.loads(toml_string)
     print("+++++++++++++++++++++++")
     print("New control structure: ")
@@ -241,8 +221,6 @@ units="mom" # TS-format
 
     y = hps.create_noise_(control_data,rng=np.random.default_rng(0))
     assert 1==1
-
-    #hps.Control.clear_all()
 
     ## LOGGER.info(f"nuevo: {len(y)}, viejo: {len(noise)}")
     ## LOGGER.info(cm.mock_calls)
