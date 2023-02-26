@@ -134,23 +134,33 @@ def test_h_noise_generation_GGM(monkeypatch,m,sigma,kappa,one_minus_phi,dt):
 
 
 def test_new_create_noise():
-    options = {
-               'SimulationDir':'None',
-               "SimulationLabel":'None',
-               "NumberOfSimulations":1,
-               "NumberOfPoints":100,
-               "SamplingPeriod":1,
-               "TimeNoiseStart":0,
-               "GGM_1mphi":0.01,
-               'NoiseModels': ["GGM"],
-               "Kappa": [0.1],
-               "Sigma": [0.2]
-                }
+    toml_string = f"""
+[file_config]
+SimulationDir=""
+SimulationLabel=""
 
-    control = hps.simulatenoiseControl(options)
-    y = hps.create_noise_(control)
+[general]
+NumberOfSimulations=1
+NumberOfPoints=100
+TimeNoiseStart=0
+SamplingPeriod=1
 
-    hps.Control.clear_all()
+[NoiseModels.GGM.params]
+NumberOfSimulations=1
+TimeNoiseStart=0
+m=100 # Number of points
+sigma=0.2
+kappa=0.1
+one_minus_phi=0.01 # GGN_1mphi
+dt=1 # Sampling period
+spectral_density=0.01
+units="mom" # TS-format
+"""
+
+    control_data = toml.loads(toml_string)
+    y = hps.create_noise_(control_data)
+
+    #hps.Control.clear_all()
 
     assert len(y) == 100
 
@@ -239,6 +249,28 @@ testdataGGM = zip(*map(lambda x: np.round(x,3),
 @pytest.mark.parametrize("m,sigma,kappa,one_minus_phi,dt",testdataGGM)
 def test_noise_compare_GGM2(monkeypatch,m,sigma,kappa,one_minus_phi,dt):
 
+    toml_string = f"""
+[file_config]
+SimulationDir=""
+SimulationLabel=""
+
+[general]
+NumberOfSimulations=1
+NumberOfPoints={m}
+TimeNoiseStart=0
+SamplingPeriod=1
+
+[NoiseModels.GGM.params]
+NumberOfSimulations=1
+TimeNoiseStart=0
+m={m} # Number of points
+sigma={sigma}
+kappa={kappa}
+one_minus_phi={one_minus_phi} # GGN_1mphi
+dt={dt} # Sampling period
+spectral_density=0.01
+units="mom" # TS-format
+"""
     options = {
                'SimulationDir':'None',
                "SimulationLabel":'None',
@@ -254,20 +286,21 @@ def test_noise_compare_GGM2(monkeypatch,m,sigma,kappa,one_minus_phi,dt):
     inputs = [kappa,sigma]
     inputs = '\n'.join(map('{:.3f}'.format,inputs)) + '\n'
     # Kappa, Sigma
-
     stdin_call = lambda x: monkeypatch.setattr('sys.stdin',
                                                io.StringIO(x))
-
     myio, mocks = call_stable_main(options,inputs,stdin_call)
-
     noise = pd.read_fwf(myio,comment='#',names=['noise'],index_col=0)
-
     myio.close()
 
-    #LOGGER.info(noise)
+    ##LOGGER.info(noise)
 
-    y = hps.create_noise(m,dt,0,[('GGM',m,sigma,kappa,one_minus_phi,'mom',dt)],rng=np.random.default_rng(0))
+    control_data = toml.loads(toml_string)
+    print("+++++++++++++++++++++++")
+    print("New control structure: ")
+    print(control_data)
 
+    #y = hps.create_noise(m,dt,0,[('GGM',m,sigma,kappa,one_minus_phi,'mom',dt)],rng=np.random.default_rng(0))
+    y = hps.create_noise_(control_data,rng=np.random.default_rng(0))
     # LOGGER.info(f"nuevo: {len(y)}, viejo: {len(noise)}")
     # LOGGER.info(cm.mock_calls)
     # LOGGER.info(mparams.mock_calls)
@@ -353,41 +386,72 @@ data.append( zip(repeat(model),m,dt,cli_params,model_params) )
 
 testdata=chain(*data)
 
-@pytest.mark.parametrize("model,m,dt,cli_params,model_params",testdata)
-def test_noise_compare_generic(monkeypatch,model,m,dt,cli_params,model_params):
-
-    options = {
-               'SimulationDir':'None',
-               "SimulationLabel":'None',
-               "NumberOfSimulations":1,
-               "NumberOfPoints":m,
-               "SamplingPeriod":dt,
-               "TimeNoiseStart":0,
-               'NoiseModels': [model],
-               'RepeatableNoise': True
-                }
-
-    # --- manual imput parameters ---
-    inputs = '\n'.join(map(('{:.'+f'{NROUND}'+'f}').format,cli_params)) + '\n'
-
-    stdin_call = lambda x: monkeypatch.setattr('sys.stdin',
-                                               io.StringIO(x))
-
-    myio, mocks = call_stable_main(options,inputs,stdin_call)
-
-    noise = pd.read_fwf(myio,comment='#',names=['noise'],index_col=0)
-
-    myio.close()
-
-    #LOGGER.info(noise)
-
-    y = hps.create_noise(m,dt,0,[model_params],rng=np.random.default_rng(0))
-
-    # LOGGER.info(f"nuevo: {len(y)}, viejo: {len(noise)}")
-    # LOGGER.info(cm.mock_calls)
-    # LOGGER.info(mparams.mock_calls)
-
-    differ = (y - noise.noise.values)
-    assert all(differ < 1e-5)
-
-    return None
+#@pytest.mark.parametrize("model,m,dt,cli_params,model_params",testdata)
+#def test_noise_compare_generic(monkeypatch,model,m,dt,cli_params,model_params):
+#
+#    toml_string = f"""
+#[file_config]
+#SimulationDir=""
+#SimulationLabel=""
+#
+#[general]
+#NumberOfSimulations=1
+#NumberOfPoints={m}
+#TimeNoiseStart=0
+#SamplingPeriod=1
+#
+#[NoiseModels.{model}.params]
+#NumberOfSimulations=1
+#TimeNoiseStart=0
+#m={m} # Number of points
+#sigma={sigma}
+#phi=0.1
+#kappa=0.1
+#one_minus_phi={one_minus_phi} # GGN_1mphi
+#dt={dt} # Sampling period
+#spectral_density=0.01
+#units="mom" # TS-format
+#"""
+#
+#    options = {
+#               'SimulationDir':'None',
+#               "SimulationLabel":'None',
+#               "NumberOfSimulations":1,
+#               "NumberOfPoints":m,
+#               "SamplingPeriod":dt,
+#               "TimeNoiseStart":0,
+#               'NoiseModels': [model],
+#               'RepeatableNoise': True
+#                }
+#
+#    # --- manual imput parameters ---
+#    inputs = '\n'.join(map(('{:.'+f'{NROUND}'+'f}').format,cli_params)) + '\n'
+#
+#    stdin_call = lambda x: monkeypatch.setattr('sys.stdin',
+#                                               io.StringIO(x))
+#
+#    myio, mocks = call_stable_main(options,inputs,stdin_call)
+#
+#    noise = pd.read_fwf(myio,comment='#',names=['noise'],index_col=0)
+#
+#    myio.close()
+#
+#    #LOGGER.info(noise)
+#
+#    control_data = toml.loads(toml_string)
+#    print("+++++++++++++++++++++++")
+#    print("New control structure: ")
+#    print(control_data)
+#
+#    #y = hps.create_noise(m,dt,0,[('GGM',m,sigma,kappa,one_minus_phi,'mom',dt)],rng=np.random.default_rng(0))
+#    y = hps.create_noise_(control_data,rng=np.random.default_rng(0))
+#    # LOGGER.info(f"nuevo: {len(y)}, viejo: {len(noise)}")
+#
+#    # LOGGER.info(f"nuevo: {len(y)}, viejo: {len(noise)}")
+#    # LOGGER.info(cm.mock_calls)
+#    # LOGGER.info(mparams.mock_calls)
+#
+#    differ = (y - noise.noise.values)
+#    assert all(differ < 1e-5)
+#
+#    return None

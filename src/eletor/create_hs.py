@@ -64,8 +64,7 @@ _paramlist = {'White':('m','sigma'),
 
 def create_h(noisemodel,*args,**kwargs):
     """ Create impulse function
-    GONZA: Esto es un dispather que se encarga de llamar a la funciron de crea ion de ruido correspondiente
-    el primer argumento es el modelo y los subsiguientes son los parametros del modelo
+    GONZA: Esto es un dispatcher que se encarga de llamar a la funcion de crea ion de ruido correspondiente el primer argumento es el modelo y los subsiguientes son los parametros del modelo
 
     Args:
         noisemodel : model name, next arguments depends on this parameter:
@@ -94,68 +93,75 @@ def create_h(noisemodel,*args,**kwargs):
         
     ## GONZA: est funcion se encarga de verificar si los parmteros que el modelo requiere estan en la lista de paramatros que se le pasa a la funcion
     ## TODO: esta responsabilidad deberia estar en la funcion despachada
-    try:
-        preprocessor = preprocess_params(_paramlist[noisemodel], noisemodel)
-    except KeyError:
-        raise ValueError('Unknown noisemodel: {0:s}'.format(noisemodel))
+    #try:
+    #    preprocessor = preprocess_params(_paramlist[noisemodel], noisemodel)
+    #except KeyError:
+    #    raise ValueError('Unknown noisemodel: {0:s}'.format(noisemodel))
 
-    kwargs = preprocessor(*args,**kwargs)
+    #kwargs = preprocessor(*args,**kwargs)
 
-    if noisemodel=='White':
-        return kwargs.get('sigma'), \
-                create_h_white(**kwargs)
-    elif noisemodel == 'Powerlaw':
-        kwargs['spectral_density'] = -kwargs['kappa']/2.0
+    #if noisemodel=='White':
+    #    return kwargs.get('sigma'), \
+    #            create_h_white(**kwargs)
 
-        return gauss_markov_scale_variance(**kwargs),\
-               create_h_Powerlaw(**kwargs)
+    #elif noisemodel == 'Powerlaw':
+    #    kwargs['spectral_density'] = -kwargs['kappa']/2.0
 
-    elif noisemodel == 'Flicker':
-        kwargs['spectral_density'] = 0.5
+    #    return gauss_markov_scale_variance(**kwargs),\
+    #           create_h_Powerlaw(**kwargs)
 
-        return gauss_markov_scale_variance(**kwargs),\
-               create_h_Flicker(**kwargs)
+    #elif noisemodel == 'Flicker':
+    #    kwargs['spectral_density'] = 0.5
 
-    elif noisemodel == 'RandomWalk':
-        kwargs['spectral_density'] = 1.0
+    #    return gauss_markov_scale_variance(**kwargs),\
+    #           create_h_Flicker(**kwargs)
 
-        return gauss_markov_scale_variance(**kwargs),\
-               create_h_RandomWalk(**kwargs)
+    #elif noisemodel == 'RandomWalk':
+    #    kwargs['spectral_density'] = 1.0
 
-    elif noisemodel == 'GGM':
-        kwargs['spectral_density'] = -kwargs['kappa']/2.0
+    #    return gauss_markov_scale_variance(**kwargs),\
+    #           create_h_RandomWalk(**kwargs)
 
-        return gauss_markov_scale_variance(**kwargs),\
-               create_h_GGM(**kwargs)
+    #elif noisemodel == 'GGM':
+    #    return create_h_GGM(**kwargs)
+    #    #kwargs['spectral_density'] = -kwargs['kappa']/2.0
 
-    elif noisemodel=='VaryingAnnual':
-        return kwargs.get('sigma'), \
-               create_h_VaryingAnnual(**kwargs)
+    #    #return gauss_markov_scale_variance(**kwargs),\
+    #    #       create_h_GGM(**kwargs)
 
-    elif noisemodel=='Matern':
-        return kwargs.get('sigma'), \
-               create_h_Matern(**kwargs)
+    #elif noisemodel=='VaryingAnnual':
+    #    return kwargs.get('sigma'), \
+    #           create_h_VaryingAnnual(**kwargs)
+
+    #elif noisemodel=='Matern':
+    #    return kwargs.get('sigma'), \
+    #           create_h_Matern(**kwargs)
 
 
-    elif noisemodel=='AR1':
-        return kwargs.get('sigma'), \
-               create_h_AR1(**kwargs)
+    #elif noisemodel=='AR1':
+    #    return kwargs.get('sigma'), \
+    #           create_h_AR1(**kwargs)
 
     assert False # Shouldn't get here
 
-def create_h_white(m,sigma,**kwags):
+def create_h_white(
+        *, 
+        m,
+        sigma,
+        **kwags
+    ):
     """
     Create impulse function for White noise.
-
+    
     $h = [\\sigma, 0, 0, ...]$
     """
-
+    
     #--- Array to fill impulse response
     h = np.zeros(m)
 
     h[0] = sigma
 
-    return h
+    return sigma, h
 
 @njit
 def recursion_Power_Flicker_RW(m,d):
@@ -173,7 +179,12 @@ def recursion_Power_Flicker_RW(m,d):
     return h
 
 @njit
-def recursion_GGM(m,d,one_minus_phi):
+def recursion_GGM(
+        *,
+        m,
+        d,
+        one_minus_phi
+    ):
     """
     Recursion to create impulse function for Powerlay, Flicker or RW noise
     Flicker is Powerlaw with spectral density 0.5
@@ -193,7 +204,7 @@ def gauss_markov_scale_variance(
         spectral_density,
         units,
         dt,
-        **kwargs):
+    ):
     """
     Gauss Markov Models needs scaling of the variance for taking into account
     the time and period units.
@@ -211,16 +222,43 @@ def gauss_markov_scale_variance(
 
     return sigma
 
-def create_h_Powerlaw(m,kappa,**kwargs):
+def create_h_Powerlaw(
+        *,
+        m,
+        kappa,
+        sigma, 
+        spectral_density,
+        units,
+        dt,
+        **kwargs
+    ):
     d = -kappa/2.0
-    return recursion_Power_Flicker_RW(m,d)
+    gmsv = gauss_markov_scale_variance(sigma=sigma,spectral_density=d,units=units,dt=dt)
+    return gmsv, recursion_Power_Flicker_RW(m,d)
 
-def create_h_Flicker(m,**kwargs):
+def create_h_Flicker(
+        *,
+        m,
+        sigma,
+        spectral_density,
+        units,
+        dt,
+        **kwargs
+    ):
     d = 0.5
+    gmsv = gauss_markov_scale_variance(sigma=sigma,spectral_density=d,units=units,dt=dt)
     return recursion_Power_Flicker_RW(m,d)
 
-def create_h_RandomWalk(m,**kwargs):
+def create_h_RandomWalk(
+        *,
+        m,
+        sigma,
+        spectral_density,
+        units,
+        dt,
+        **kwargs):
     d = 1.0
+    gmsv = gauss_markov_scale_variance(sigma=sigma,spectral_density=d,units=units,dt=dt)
     return recursion_Power_Flicker_RW(m,d)
 
 #def create_h_GGM(m,kappa,one_minus_phi,**kwargs):
@@ -230,9 +268,16 @@ def create_h_GGM(
         m,
         kappa,
         one_minus_phi,
-        **kwargs):
+        sigma,
+        units,
+        dt,
+        **kwargs
+    ):
     d = -kappa/2.0
-    return recursion_GGM(m,d,one_minus_phi)
+    gmsv = gauss_markov_scale_variance(sigma=sigma,spectral_density=d,units=units,dt=dt)
+    r_GGM = recursion_GGM(m=m,d=d,one_minus_phi=one_minus_phi)
+    return gmsv, r_GGM
+
 
 @njit
 def recursion_VaryingAnnual(m,phi,dt):
@@ -245,20 +290,34 @@ def recursion_VaryingAnnual(m,phi,dt):
 
     return t
 
-def create_h_VaryingAnnual(m,phi,units,dt,**kwargs):
+def create_h_VaryingAnnual(
+        *,
+        m,
+        phi,
+        units,
+        dt,
+        sigma,
+        **kwargs
+    ):
     if not units=='mom':
         raise ValueError('Please think again, ts_format is not mom!!!')
 
     t = recursion_VaryingAnnual(m,phi,dt)
     h = mactrick(m,t)
 
-    return h
+    return sigma, h
 
 
-def create_h_Matern(m,lamba,kappa,**kwargs):
+def create_h_Matern(
+        *,
+        m,
+        lamba,
+        kappa,
+        sigma,
+        **kwargs):
 
     threshold = 100.0
-
+    print("-------> ", kappa)
     d = -0.5*kappa
 
     #--- create gamma_x
@@ -286,7 +345,7 @@ def create_h_Matern(m,lamba,kappa,**kwargs):
 
     h = mactrick(m,t)
 
-    return h
+    return sigma, h
 
 @njit
 def recursion_AR1(m,phi):
@@ -299,10 +358,16 @@ def recursion_AR1(m,phi):
 
     return t
 
-def create_h_AR1(m,phi,**kwargs):
+def create_h_AR1(
+        *,
+        m,
+        phi,
+        sigma,
+        **kwargs
+    ):
 
     t = recursion_AR1(m,phi)
     h = mactrick(m,t)
 
-    return h
+    return sigma, h
 

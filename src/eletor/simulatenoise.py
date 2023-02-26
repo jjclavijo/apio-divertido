@@ -512,11 +512,17 @@ def create_noise_(
 def create_noise(m,dt,ms,noiseModels,rng=None):
     """ Toma la lista de los modelos que quiere usar junto con los parametros y isntancia los nuevos modelos desde create_H
     """
+
     sigma = []
     h = []
     for model, params in noiseModels.items():
         print(f"--> About to run model {model} with params {params['params']}")
-        single_s, single_h = create_h_new(model, **params['params'])
+
+        ## Dinamycally get and call the function using the model name
+        ## TODO capitalize/or not all function names
+        model_function = getattr(create_hs, f"create_h_{model}")
+        single_s, single_h = model_function(**params['params'])
+
         sigma.append(single_s)
         h.append(single_h)
 
@@ -528,6 +534,7 @@ def create_noise(m,dt,ms,noiseModels,rng=None):
     y = np.zeros(m)
 
     for s,ha in zip(sigma,h):
+        print(s, ha)
         w = s * rng.standard_normal(m+ms)
         y += signal.fftconvolve(ha, w)[0:m]
 
