@@ -33,6 +33,7 @@ from pathlib import Path
 from scipy.special import kv
 
 from eletor.create_hs import create_h as create_h_new
+from eletor import create_hs
 
 #===============================================================================
 # Subroutines
@@ -360,7 +361,7 @@ hooks = [
 def simulatenoiseControl(fname,*args,**kwargs):
     if not "hooks" in kwargs:
         kwargs["hooks"] = hooks
-    return Control(fname,control_defaults,*args,**kwargs)
+    return Control(fname,control_defaults,args,**kwargs)
 
 def simulate_noise(control,observations):
 
@@ -439,7 +440,12 @@ _paramlist = {'White':('NumberOfPoints','Sigma'),
               'Matern':('NumberOfPoints','Sigma','Lambda','Kappa'),
               'AR1':('NumberOfPoints','Sigma','Phi')}
 
-def get_nm_parameter(ix,model,control,parameter):
+def get_nm_parameter(
+        ix,
+        model,
+        control,
+        parameter
+    ):
     if parameter == 'NumberOfPoints':
         return control['NumberOfPoints']
     if parameter == 'Sigma':
@@ -477,38 +483,42 @@ def get_nm_parameter(ix,model,control,parameter):
 
     raise ValueError(f'Incorrect parameter {parameter} for required model {model}')
 
-def get_noisemodels(control):
-    models = control["NoiseModels"]
-    if not isinstance(models,list):
-        models = [models]
+def create_noise_(
+        control,
+        rng=None
+    ):
+    """ Configure and create noise from the config file
+    Args:
+        control: dict
+            Dictionary with the control parameters, content raw
+        rng: np.random.Generator or None
+            ??
+    Returns:
+        noise: np.ndarray
+            Array with the noise
+    TODO: Nombre de las variables podrian ser mas decriptivos
+    TODO: los aprametros generales como n_simulations, m, dt, ms, deberian ser pasados como argumentos
+    TODO: los modelos y sus configuraciones deberian ser pasados como un diccionario/argumento aparte
+    """
 
-    rmodels = []
-
-    for ix,model in enumerate(models):
-        rmodels.append( [model] +\
-            [get_nm_parameter(ix,model,control,p) for p in _paramlist[model]] )
-
-    return rmodels
-
-def create_noise_(control,rng=None):
-
-    #n_simulations = control.get("NumberOfSimulations")
-    m             = control["NumberOfPoints"]
-    dt            = control["SamplingPeriod"]
-    ms            = control["TimeNoiseStart"]
-
-    noiseModels   = get_noisemodels(control)
-
+    n_simulations = control['general']["NumberOfSimulations"]
+    m             = control['general']["NumberOfPoints"]
+    dt            = control['general']["SamplingPeriod"]
+    ms            = control['general']["TimeNoiseStart"]
+    
+    noiseModels   = control['NoiseModels']
     return create_noise(m,dt,ms,noiseModels,rng)
 
 def create_noise(m,dt,ms,noiseModels,rng=None):
-
-    sigma,h = zip(*[create_h_new(*model)
-                        for model in noiseModels])
-        # Pass index instead of noisemodel
-        # create_h function access control.get('Noisemodels') and other
-        # parameters from there
-                   #sigma[ix], h[ix] = create_h_new(*model)
+    """ Toma la lista de los modelos que quiere usar junto con los parametros y isntancia los nuevos modelos desde create_H
+    """
+    sigma = []
+    h = []
+    for model, params in noiseModels.items():
+        print(f"--> About to run model {model} with params {params['params']}")
+        single_s, single_h = create_h_new(model, **params['params'])
+        sigma.append(single_s)
+        h.append(single_h)
 
     #--- Create random number generator
     if rng is None:

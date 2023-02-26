@@ -64,6 +64,9 @@ _paramlist = {'White':('m','sigma'),
 
 def create_h(noisemodel,*args,**kwargs):
     """ Create impulse function
+    GONZA: Esto es un dispather que se encarga de llamar a la funciron de crea ion de ruido correspondiente
+    el primer argumento es el modelo y los subsiguientes son los parametros del modelo
+
     Args:
         noisemodel : model name, next arguments depends on this parameter:
 
@@ -88,7 +91,9 @@ def create_h(noisemodel,*args,**kwargs):
     Returns:
         sigma, h : noise amplitude + array of float with impulse response
     """
-
+        
+    ## GONZA: est funcion se encarga de verificar si los parmteros que el modelo requiere estan en la lista de paramatros que se le pasa a la funcion
+    ## TODO: esta responsabilidad deberia estar en la funcion despachada
     try:
         preprocessor = preprocess_params(_paramlist[noisemodel], noisemodel)
     except KeyError:
@@ -182,7 +187,13 @@ def recursion_GGM(m,d,one_minus_phi):
 
     return h
 
-def gauss_markov_scale_variance(sigma,spectral_density,units,dt,**kwargs):
+def gauss_markov_scale_variance(
+        *, 
+        sigma,
+        spectral_density,
+        units,
+        dt,
+        **kwargs):
     """
     Gauss Markov Models needs scaling of the variance for taking into account
     the time and period units.
@@ -212,7 +223,14 @@ def create_h_RandomWalk(m,**kwargs):
     d = 1.0
     return recursion_Power_Flicker_RW(m,d)
 
-def create_h_GGM(m,kappa,one_minus_phi,**kwargs):
+#def create_h_GGM(m,kappa,one_minus_phi,**kwargs):
+## El asterisco es para que los parametros que se le pasan a la funcion sean nombrados
+def create_h_GGM(
+        *,
+        m,
+        kappa,
+        one_minus_phi,
+        **kwargs):
     d = -kappa/2.0
     return recursion_GGM(m,d,one_minus_phi)
 
