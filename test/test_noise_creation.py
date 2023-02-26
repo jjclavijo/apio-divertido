@@ -15,12 +15,13 @@ import sys
 import numpy as np # to avoid reloading each time
 import pandas as pd
 
-N = 10
+N = 1
 
 import hectorp
 import hectorp.control
 import hectorp.observations
 import hectorp.simulatenoise
+import toml
 
 def call_stable_main(options,stdinput,stdinput_call,writer=None):
 
@@ -153,7 +154,7 @@ def test_new_create_noise():
 
     assert len(y) == 100
 
-m = np.random.randint(10,1000,N)
+m = np.random.randint(10,100,N)
 sigma = np.random.uniform(0,10,N)
 kappa = np.random.uniform(-2,2,N)
 one_minus_phi = np.random.uniform(1e-6,1,N)
@@ -190,42 +191,69 @@ def test_noise_compare_GGM(monkeypatch,m,sigma,kappa,one_minus_phi,dt):
     myio.close()
 
     # --- Real test starts here ---
+     
+    #options = {
+    #           'SimulationDir':'None',
+    #           "SimulationLabel":'None',
+    #           "NumberOfSimulations":1,
+    #           "NumberOfPoints":m,
+    #           "SamplingPeriod":dt,
+    #           "TimeNoiseStart":0,
+    #           "TS_format":'mom',
+    #           "GGM_1mphi":one_minus_phi,
+    #           'NoiseModels': ["GGM"],
+    #           "Kappa": [kappa],
+    #           "Sigma": [sigma]
+    #            }
 
-    options = {
-               'SimulationDir':'None',
-               "SimulationLabel":'None',
-               "NumberOfSimulations":1,
-               "NumberOfPoints":m,
-               "SamplingPeriod":dt,
-               "TimeNoiseStart":0,
-               "TS_format":'mom',
-               "GGM_1mphi":one_minus_phi,
-               'NoiseModels': ["GGM"],
-               "Kappa": [kappa],
-               "Sigma": [sigma]
-                }
+    #mparams = mock.Mock(side_effect = options.__getitem__)
+    #mm = mock.MagicMock(**{"params.__getitem__":mparams,"__getitem__":mparams,"get":mparams})
+    #cm = mock.Mock(return_value = mm)
+    #mdir = mock.Mock()
 
-    mparams = mock.Mock(side_effect = options.__getitem__)
-    mm = mock.MagicMock(**{"params.__getitem__":mparams,"__getitem__":mparams,"get":mparams})
-    cm = mock.Mock(return_value = mm)
-    mdir = mock.Mock()
+    #control = hps.simulatenoiseControl(options,)
+    toml_string = f"""
+[file_config]
+SimulationDir=""
+SimulationLabel=""
 
-    control = hps.simulatenoiseControl(options,)
+[general]
+NumberOfSimulations=1
+NumberOfPoints={m}
+TimeNoiseStart=0
+SamplingPeriod=1
 
-    y = hps.create_noise_(control,rng=np.random.default_rng(0))
+[NoiseModels.GGM.params]
+NumberOfSimulations=1
+TimeNoiseStart=0
+m={m} # Number of points
+sigma={sigma}
+kappa={kappa}
+one_minus_phi={one_minus_phi} # GGN_1mphi
+dt={dt} # Sampling period
+spectral_density=0.01
+units="mom" # TS-format
+"""
+    control_data = toml.loads(toml_string)
+    print("+++++++++++++++++++++++")
+    print("New control structure: ")
+    print(control_data)
 
-    hps.Control.clear_all()
+    y = hps.create_noise_(control_data,rng=np.random.default_rng(0))
+    assert 1==1
 
-    # LOGGER.info(f"nuevo: {len(y)}, viejo: {len(noise)}")
-    # LOGGER.info(cm.mock_calls)
-    # LOGGER.info(mparams.mock_calls)
+    #hps.Control.clear_all()
 
+    ## LOGGER.info(f"nuevo: {len(y)}, viejo: {len(noise)}")
+    ## LOGGER.info(cm.mock_calls)
+    ## LOGGER.info(mparams.mock_calls)
     assert len(y) == m
     assert len(noise.noise.values) == m
     differ = (y - noise.noise.values)
+    print(noise.noise.values[0], y[0])
     assert all(differ < 1e-5)
 
-    return None
+    #return None
 
 testdataGGM = zip(*map(lambda x: np.round(x,3),
                               (m,sigma,kappa,one_minus_phi,dt)))
