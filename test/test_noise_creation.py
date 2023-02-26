@@ -329,7 +329,56 @@ sigma, kappa, dt = map(lambda x: np.round(x,NROUND),(sigma,kappa,dt))
 cli_params = zip(kappa,sigma)
 model_params = zip(repeat(model),m,sigma,kappa,repeat('mom'),dt)
 
-data.append( zip(repeat(model),m,dt,cli_params,model_params) )
+model_params = [(365,sigma[0],kappa[0],'mom',dt[0],(kappa[0], sigma[0])),]
+@pytest.mark.parametrize("m,sigma,kappa,units,dt,cli_params",model_params)
+def test_noise_Powerlaw(monkeypatch,m,sigma,kappa,units,dt,cli_params):
+
+    options = {
+               'SimulationDir':'None',
+               "SimulationLabel":'None',
+               "NumberOfSimulations":1,
+               "NumberOfPoints":m,
+               "SamplingPeriod":dt,
+               "TimeNoiseStart":0,
+               'NoiseModels': ['Powerlaw'],
+               'RepeatableNoise': True
+                }
+
+    # --- manual imput parameters ---
+    inputs = '\n'.join(map(('{:.'+f'{NROUND}'+'f}').format,cli_params)) + '\n'
+    stdin_call = lambda x: monkeypatch.setattr('sys.stdin',
+                                               io.StringIO(x))
+    myio, mocks = call_stable_main(options,inputs,stdin_call)
+    noise = pd.read_fwf(myio,comment='#',names=['noise'],index_col=0)
+    myio.close()
+
+    toml_string = f"""
+[file_config]
+SimulationDir=""
+SimulationLabel=""
+
+[general]
+NumberOfSimulations=1
+NumberOfPoints={m}
+TimeNoiseStart=0
+SamplingPeriod=1
+
+[NoiseModels.Powerlaw.params]
+NumberOfSimulations=1
+TimeNoiseStart=0
+m={m} # Number of points
+sigma={sigma}
+kappa={kappa}
+dt={dt} # Sampling period
+units="{units}" # TS-format
+spectral_density=0.01
+"""
+    control_data = toml.loads(toml_string)
+    #y = hps.create_noise(m,dt,0,[('GGM',m,sigma,kappa,one_minus_phi,'mom',dt)],rng=np.random.default_rng(0))
+    y = hps.create_noise_(control_data,rng=np.random.default_rng(0))
+
+    differ = (y - noise.noise.values)
+    assert all(differ < 1e-5)
 
 model = "Flicker"
 
@@ -388,6 +437,9 @@ testdata=chain(*data)
 
 #@pytest.mark.parametrize("model,m,dt,cli_params,model_params",testdata)
 #def test_noise_compare_generic(monkeypatch,model,m,dt,cli_params,model_params):
+#    print()
+#    print("++++++++++++++++++++++++++++++")
+#    print(f"model: {model}, m: {m}, dt: {dt}, cli_params: {cli_params}, model_params: {model_params}")
 #
 #    toml_string = f"""
 #[file_config]
@@ -426,17 +478,11 @@ testdata=chain(*data)
 #
 #    # --- manual imput parameters ---
 #    inputs = '\n'.join(map(('{:.'+f'{NROUND}'+'f}').format,cli_params)) + '\n'
-#
 #    stdin_call = lambda x: monkeypatch.setattr('sys.stdin',
 #                                               io.StringIO(x))
-#
 #    myio, mocks = call_stable_main(options,inputs,stdin_call)
-#
 #    noise = pd.read_fwf(myio,comment='#',names=['noise'],index_col=0)
-#
 #    myio.close()
-#
-#    #LOGGER.info(noise)
 #
 #    control_data = toml.loads(toml_string)
 #    print("+++++++++++++++++++++++")
