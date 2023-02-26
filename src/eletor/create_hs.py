@@ -112,7 +112,7 @@ def create_h_Flicker(
     ):
     d = 0.5
     gmsv = gauss_markov_scale_variance(sigma=sigma,spectral_density=d,units=units,dt=dt)
-    return recursion_Power_Flicker_RW(m,d)
+    return gmsv, recursion_Power_Flicker_RW(m,d)
 
 def create_h_RandomWalk(
         *,
@@ -124,7 +124,7 @@ def create_h_RandomWalk(
         **kwargs):
     d = 1.0
     gmsv = gauss_markov_scale_variance(sigma=sigma,spectral_density=d,units=units,dt=dt)
-    return recursion_Power_Flicker_RW(m,d)
+    return gmsv, recursion_Power_Flicker_RW(m,d)
 
 #def create_h_GGM(m,kappa,one_minus_phi,**kwargs):
 ## El asterisco es para que los parametros que se le pasan a la funcion sean nombrados
