@@ -317,19 +317,13 @@ from itertools import repeat, chain
 NROUND = 5
 
 data = []
-
 model = "Powerlaw"
-sigma = np.random.uniform(0,10,N)
-kappa = np.random.uniform(-2,2,N)
-m = np.random.randint(10,1000,N)
-dt = np.random.uniform(0.5,20,N)
+sigma = np.random.uniform(0,10)
+kappa = np.random.uniform(-2,2)
+m = np.random.randint(10,1000)
+dt = np.random.uniform(0.5,20)
 
-sigma, kappa, dt = map(lambda x: np.round(x,NROUND),(sigma,kappa,dt))
-
-cli_params = zip(kappa,sigma)
-model_params = zip(repeat(model),m,sigma,kappa,repeat('mom'),dt)
-
-model_params = [(365,sigma[0],kappa[0],'mom',dt[0],(kappa[0], sigma[0])),]
+model_params = [(m,sigma,kappa,'mom',dt,(kappa, sigma)),]
 @pytest.mark.parametrize("m,sigma,kappa,units,dt,cli_params",model_params)
 def test_noise_Powerlaw(monkeypatch,m,sigma,kappa,units,dt,cli_params):
 
@@ -346,8 +340,7 @@ def test_noise_Powerlaw(monkeypatch,m,sigma,kappa,units,dt,cli_params):
 
     # --- manual imput parameters ---
     inputs = '\n'.join(map(('{:.'+f'{NROUND}'+'f}').format,cli_params)) + '\n'
-    stdin_call = lambda x: monkeypatch.setattr('sys.stdin',
-                                               io.StringIO(x))
+    stdin_call = lambda x: monkeypatch.setattr('sys.stdin', io.StringIO(x))
     myio, mocks = call_stable_main(options,inputs,stdin_call)
     noise = pd.read_fwf(myio,comment='#',names=['noise'],index_col=0)
     myio.close()
@@ -374,66 +367,107 @@ units="{units}" # TS-format
 spectral_density=0.01
 """
     control_data = toml.loads(toml_string)
-    #y = hps.create_noise(m,dt,0,[('GGM',m,sigma,kappa,one_minus_phi,'mom',dt)],rng=np.random.default_rng(0))
+    y = hps.create_noise_(control_data,rng=np.random.default_rng(0))
+    differ = (y - noise.noise.values)
+    assert len(y) == len(noise.noise.values)
+    assert all(differ < 1e-4)
+
+model = "Flicker"
+model_params = [(m,sigma,'mom',dt,(sigma,)),]
+@pytest.mark.parametrize("m,sigma,units,dt,cli_params",model_params)
+def test_noise_Flicker(monkeypatch,m,sigma,units,dt,cli_params):
+
+    options = {
+               'SimulationDir':'None',
+               "SimulationLabel":'None',
+               "NumberOfSimulations":1,
+               "NumberOfPoints":m,
+               "SamplingPeriod":dt,
+               "TimeNoiseStart":0,
+               'NoiseModels': ['Flicker'],
+               'RepeatableNoise': True
+                }
+
+    # --- manual imput parameters ---
+    inputs = '\n'.join(map(('{:.'+f'{NROUND}'+'f}').format,cli_params)) + '\n'
+    stdin_call = lambda x: monkeypatch.setattr('sys.stdin', io.StringIO(x))
+    myio, mocks = call_stable_main(options,inputs,stdin_call)
+    noise = pd.read_fwf(myio,comment='#',names=['noise'],index_col=0)
+    myio.close()
+
+    toml_string = f"""
+[file_config]
+SimulationDir=""
+SimulationLabel=""
+
+[general]
+NumberOfSimulations=1
+NumberOfPoints={m}
+TimeNoiseStart=0
+SamplingPeriod=1
+
+[NoiseModels.Flicker.params]
+NumberOfSimulations=1
+TimeNoiseStart=0
+m={m} # Number of points
+sigma={sigma}
+dt={dt} # Sampling period
+units="{units}" # TS-format
+spectral_density=0.01
+"""
+    control_data = toml.loads(toml_string)
     y = hps.create_noise_(control_data,rng=np.random.default_rng(0))
 
     differ = (y - noise.noise.values)
     assert all(differ < 1e-5)
-
-model = "Flicker"
-
-cli_params = zip(sigma)
-model_params = zip(repeat(model),m,sigma,repeat('mom'),dt)
-
-data.append( zip(repeat(model),m,dt,cli_params,model_params) )
-
-model = "RandomWalk" #Shares parameters with Flicker
-
-cli_params = zip(sigma)
-model_params = zip(repeat(model),m,sigma,repeat('mom'),dt)
-
-data.append( zip(repeat(model),m,dt,cli_params,model_params) )
-
-model = "GGM"
-
-one_minus_phi = np.random.uniform(1e-5,1,N)
-one_minus_phi = np.round(one_minus_phi,NROUND)
-
-cli_params = zip(one_minus_phi,kappa,sigma)
-model_params = zip(repeat(model),m,sigma,kappa,one_minus_phi,repeat('mom'),dt)
-
-data.append( zip(repeat(model),m,dt,cli_params,model_params) )
-
-model = "VaryingAnnual"
-phi = np.random.uniform(1e-5,1,N)
-phi = np.round(phi,NROUND)
-
-cli_params = zip(phi,sigma)
-model_params = zip(repeat(model),m,sigma,phi,repeat('mom'),dt)
-
-data.append( zip(repeat(model),m,dt,cli_params,model_params) )
-
-model = "Matern"
-
-lamba = np.random.uniform(1,10,N) * 10 ** np.random.uniform(-3,-1,N)
-kappa = np.random.uniform(-2,-0.5,N) # Kappa for Matern differs from other models
-
-lamba, kappa = map(lambda x: np.round(x,NROUND),(lamba,kappa))
-
-cli_params = zip(lamba,kappa,sigma)
-model_params = zip(repeat(model),m,sigma,lamba,kappa)
-
-data.append( zip(repeat(model),m,dt,cli_params,model_params) )
-
-model = "AR1"
-
-cli_params = zip(phi,sigma)
-model_params = zip(repeat(model),m,sigma,phi)
-
-data.append( zip(repeat(model),m,dt,cli_params,model_params) )
-
-
-testdata=chain(*data)
+#
+#model = "RandomWalk" #Shares parameters with Flicker
+#
+#cli_params = zip(sigma)
+#model_params = zip(repeat(model),m,sigma,repeat('mom'),dt)
+#
+#data.append( zip(repeat(model),m,dt,cli_params,model_params) )
+#
+#model = "GGM"
+#
+#one_minus_phi = np.random.uniform(1e-5,1,N)
+#one_minus_phi = np.round(one_minus_phi,NROUND)
+#
+#cli_params = zip(one_minus_phi,kappa,sigma)
+#model_params = zip(repeat(model),m,sigma,kappa,one_minus_phi,repeat('mom'),dt)
+#
+#data.append( zip(repeat(model),m,dt,cli_params,model_params) )
+#
+#model = "VaryingAnnual"
+#phi = np.random.uniform(1e-5,1,N)
+#phi = np.round(phi,NROUND)
+#
+#cli_params = zip(phi,sigma)
+#model_params = zip(repeat(model),m,sigma,phi,repeat('mom'),dt)
+#
+#data.append( zip(repeat(model),m,dt,cli_params,model_params) )
+#
+#model = "Matern"
+#
+#lamba = np.random.uniform(1,10,N) * 10 ** np.random.uniform(-3,-1,N)
+#kappa = np.random.uniform(-2,-0.5,N) # Kappa for Matern differs from other models
+#
+#lamba, kappa = map(lambda x: np.round(x,NROUND),(lamba,kappa))
+#
+#cli_params = zip(lamba,kappa,sigma)
+#model_params = zip(repeat(model),m,sigma,lamba,kappa)
+#
+#data.append( zip(repeat(model),m,dt,cli_params,model_params) )
+#
+#model = "AR1"
+#
+#cli_params = zip(phi,sigma)
+#model_params = zip(repeat(model),m,sigma,phi)
+#
+#data.append( zip(repeat(model),m,dt,cli_params,model_params) )
+#
+#
+#testdata=chain(*data)
 
 #@pytest.mark.parametrize("model,m,dt,cli_params,model_params",testdata)
 #def test_noise_compare_generic(monkeypatch,model,m,dt,cli_params,model_params):
