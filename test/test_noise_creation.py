@@ -24,7 +24,20 @@ import hectorp.simulatenoise
 import toml
 
 def call_stable_main(options,stdinput,stdinput_call,writer=None):
+    """
+    Esta función sirve para llamar a la versión "estable" de hector,
+    La idea es que se mockea la clase Control para pasar un diccionario
+    común con todas las opciones (en el formato que las usa el programa
+    original), y se pasan por la stdin los parámetros necesarios (que son
+    un bodrio porque cada modelo de ruido tiene un orden).
 
+    Debería funcionar bien si uno sabe el orden en el que se pasan los
+    parámetros por STDIN al programa original.
+    """
+
+    # TODO: Pasar la STDIN a donde corresponda. el stdin_call es un objeto que
+    # viene del fixture de unittest, supongo que se puede usar sin necesidad de
+    # pasarlo como parámetro, pero no lo aprendí a hacer.
     stdinput_call(stdinput)
 
     # --- prepare mocking of Control object with options dictionary
@@ -33,6 +46,8 @@ def call_stable_main(options,stdinput,stdinput_call,writer=None):
     mockControl = mock.Mock(return_value = mockControlParams)
 
     # --- Mock control ---
+    # Se necesita hacer el mock en todos los modulos que lo usan, porque
+    # cada una lo llama como si fuera un objeto independiente.
     with mock.patch('hectorp.control.Control',mockControl),\
          mock.patch('hectorp.observations.Control',mockControl),\
          mock.patch('hectorp.simulatenoise.Control',mockControl):
@@ -57,7 +72,6 @@ def call_stable_main(options,stdinput,stdinput_call,writer=None):
         # We will mock sys.open to always return the writer mock.
         mockOpen = mock.Mock(return_value=mockFile)
 
-
         mockMdir = mock.Mock()
 
         # Mock Filesistem Calls on observations, force CLI arguments to be
@@ -78,13 +92,15 @@ def call_stable_main(options,stdinput,stdinput_call,writer=None):
                          'observations.open':mockOpen,
                          'os.makedirs':mockMdir}
 
-import eletor.simulatenoise as hps
+
+"""
+# Este test estaba simplemente para verificar que se podía llamar
+# a la versión original del programa y andaba. Por ahora se comenta.
+# después se borra.
 
 testdataGGM = [ (10,1,0.23,0.01,1), (20,2.3,0.51,0.01,1) ]
 @pytest.mark.parametrize("m,sigma,kappa,one_minus_phi,dt",testdataGGM)
 def test_h_noise_generation_GGM(monkeypatch,m,sigma,kappa,one_minus_phi,dt):
-
-    LOGGER.info(monkeypatch)
 
     options = {
                'SimulationDir':'None',
@@ -132,6 +148,10 @@ def test_h_noise_generation_GGM(monkeypatch,m,sigma,kappa,one_minus_phi,dt):
 
     return None
 
+"""
+
+import eletor.simulatenoise as hps
+
 
 def test_new_create_noise():
     toml_string = f"""
@@ -159,8 +179,6 @@ units="mom" # TS-format
 
     control_data = toml.loads(toml_string)
     y = hps.create_noise_(control_data)
-
-    #hps.Control.clear_all()
 
     assert len(y) == 100
 
@@ -212,13 +230,13 @@ NumberOfPoints={m}
 TimeNoiseStart=0
 SamplingPeriod=1
 
-[NoiseModels.GGM.params]
+[NoiseModels.GGM.1]
 NumberOfSimulations=1
 TimeNoiseStart=0
 m={m} # Number of points
 sigma={sigma}
 kappa={kappa}
-one_minus_phi={one_minus_phi} # GGN_1mphi
+one_minus_phi={one_minus_phi} # GGM_1mphi
 dt={dt} # Sampling period
 spectral_density=0.01
 units="mom" # TS-format

@@ -30,15 +30,13 @@ import os
 import sys
 import math
 import re
-from eletor.control import Control
-from eletor.control import SingletonMeta
 from pathlib import Path
 
 #==============================================================================
 # Class definition
 #==============================================================================
 
-class Observations(metaclass=SingletonMeta):
+class Observations():
     """Class to store my time series together with some metadata
 
     Methods
@@ -55,7 +53,7 @@ class Observations(metaclass=SingletonMeta):
         make index regularly spaced + fill gaps with NaN's
     """
 
-    def __init__(self):
+    def __init__(self,control={}):
         """This is my time series class
 
         This constructor defines the time series in pandas DataFrame data,
@@ -63,18 +61,11 @@ class Observations(metaclass=SingletonMeta):
 
         """
 
-        #--- Get control parameters (singleton)
-        control = Control()
-        try:
-            self.verbose = control.params['Verbose']
-        except:
-            self.verbose = True
+        #--- Get control parameters
+        self.verbose = control.get('Verbose',True)
 
         #--- Scale factor
-        try:
-            self.scale_factor = float(control.params['ScaleFactor'])
-        except:
-            self.scale_factor = 1.0
+        self.scale_factor = float(control.get('ScaleFactor',1.0))
 
         #--- class variables
         self.data = pd.DataFrame()
@@ -89,43 +80,38 @@ class Observations(metaclass=SingletonMeta):
         self.column_name=''
 
         #--- Read filename with observations and the directory
-        try:
-            self.datafile = control.params['DataFile']
-            directory = Path(control.params['DataDirectory'])
+        self.datafile = control.get('DataFile',None)
+        directory = Path(control.get('DataDirectory',''))
+
+        if self.datafile is None:
+            fname = None
+        else:
             fname = str(directory / self.datafile)
-        except Exception as e:
-            fname = self.datafile = 'None'
-            directory = ''
 
         #--- Which format?
-        try:
-            self.ts_format = control.params['TS_format']
-        except:
-            self.ts_format = 'mom'
+        self.ts_format = control.get('TS_format','mom')
+
         if self.ts_format == 'mom':
-            if not fname=='None':
+            if not fname is None:
                 self.momread(fname)
         elif self.ts_format == 'msf':
             #--- Are there columns with estimated trajectory models
-            try:
-                self.use_residuals = control.params['UseResiduals']
-            except:
-                self.use_residuals = False
+            self.use_residuals = control.get('UseResiduals',False)
             #--- Which column
-            try:
-                self.observation_column = control.params['ObservationColumn']
-            except Exception as e:
-                print(e)
-                sys.exit()
-            if not fname=='None':
+            if not 'ObservationColumn' in control.keys():
+                raise ValueError('ObservationColumn is mandatory for msf files')
+
+            self.observation_column = control['ObservationColumn']
+
+            if not fname is None:
                 self.msfread(fname)
         else:
-            print('Unknown format: {0:s}'.format(self.ts_format))
-            sys.exit()
+            raise ValueError('Unknown format: {0:s}'.format(self.ts_format))
 
         #--- Inform the user
         if self.verbose==True:
-            print("\nFilename                   : {0:s}".format(fname))
+            if not fname is None:
+                print("\nFilename                   : {0:s}".format(fname))
             print("TS_format                  : {0:s}".format(self.ts_format))
             print("ScaleFactor                : {0:f}".\
                                                     format(self.scale_factor))
@@ -134,7 +120,7 @@ class Observations(metaclass=SingletonMeta):
                                              format(self.observation_column))
                 print("Use Residuals              : {0:}".\
                                                     format(self.use_residuals))
-            if not fname=='None':
+            if not fname is None:
                 print("Number of observations+gaps: {0:d}".format(self.m))
                 print("Percentage of gaps         : {0:5.1f}".\
 					                           format(self.percentage_gaps))
