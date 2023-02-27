@@ -20,8 +20,6 @@
 import os
 import sys
 
-from functools import singledispatchmethod
-
 #==============================================================================
 # Class definition
 #==============================================================================
@@ -55,28 +53,11 @@ class SingletonMeta(type):
     def clear_all(*args, **kwargs):
         SingletonMeta._instances = {}
 
-class ControlClass:
+class Control:
     """Class to store parameters that prescribe how the analysis should be done
     """
-    # Implement singledispatchmethod for dict or file
-    # https://realpython.com/python-multiple-constructors/
-    @singledispatchmethod
-    def __init__(self, ctl_file=None,
-                 defaults={},opt_defaults={},path_provided=False,unatended=False):
-        raise NotImplementedError(f"could not initialize control from {type(ctl_file)}")
-
-    @__init__.register(type(None))
-    def _from_none(self, ctl,
-                 defaults={},opt_defaults={},path_provided=False,unatended=False):
-        fname = input(f'No config file, write defaults to: ')
-        if os.path.exists(ctl_file):
-            raise FileExistsError("file already exists")
-        else:
-            self.generate_default(fname,defaults,opt_defaults)
-
-    @__init__.register(str)
-    def _from_file(self, ctl_file,
-                 defaults={},opt_defaults={},unatended=False,hooks=[]):
+    def __init__(self, ctl_file,
+                 defaults={},unatended=False):
         """This is my Control class
 
         Args:
@@ -87,32 +68,14 @@ class ControlClass:
                        Defaults for mandatory arguments will not be used unless
                        explicitly asked by de user or by passing the unatended
                        flag, in which case a warning will be logged.
-            opt_defaults : dictionary of labels:defaultValue
-                           for optional argumens
-
-        ** ValidValues and comments are ignored in this version, planed for
-        ** automatic checks and automatic writing of detailed sample control files
         """
 
-        self.params = {}
-
-        self.defaults = defaults
-        self.opt_defaults = opt_defaults
-        self.unatended = unatended
-
         if not os.path.exists(ctl_file):
-            # print('Cannot open {0:s}'.format(ctl_file))
-            # sys.exit()
+            raise FileNotFoundError(2,"No such file or directory",ctl_file)
 
-            # If path was not explicitly provided by user and default options
-            # Where provided, offer writing a default configuration file.
-            if defaults:
-                if unatended or \
-                   (input(f'No config file, write defaults to <{ctl_file}> [y/N]: ')\
-                    in ('y','Y')):
-                    self.generate_default(ctl_file,defaults,opt_defaults)
-            else:
-                raise FileNotFoundError(2,"No such file or directory",ctl_file)
+        self.params = {}
+        self.defaults = defaults
+        self.unatended = unatended
 
         with open(ctl_file,'r') as fp:
             for line in fp:
@@ -152,38 +115,6 @@ class ControlClass:
                             # format(label))
                             # sys.exit()
 
-        #run check hooks
-        for f in hooks:
-            f(self)
-
-    @__init__.register(dict)
-    def _from_dict(self, ctl_dict,
-                 defaults={},opt_defaults={},path_provided=False,unatended=True,hooks=[]):
-        """This is my Control class
-
-        Args:
-            ctl_dict (dictionary) : dictionary with parameters
-        Oprional Args:
-            defaults : dictionary of labels:(defaultValue,validValues,comments)
-                       for mandatory arguments.
-                       Defaults for mandatory arguments will not be used unless
-                       explicitly asked by de user or by passing the unatended
-                       flag, in which case a warning will be logged.
-            opt_defaults : dictionary of labels:(defaultValue,validValues,comments)
-                           for optional argumens
-
-        ** ValidValues and comments are ignored in this version, planed for
-        ** automatic checks and automatic writing of detailed sample control files
-        """
-        self.params = ctl_dict
-        self.defaults = defaults
-        self.opt_defaults = opt_defaults
-        self.unatended = unatended
-
-        #run check hooks
-        for f in hooks:
-            f(self)
-
     def is_float(self,x):
         """ Check if string is float
 
@@ -198,25 +129,6 @@ class ControlClass:
             return True
         except ValueError:
             return False
-
-    def generate_default(self,fname,defaults,optdefaults):
-        if os.path.exists(fname):
-            raise FileExistsError("file already exists")
-
-        with open(fname,'w') as f:
-            for k,v in defaults.items():
-                if isinstance(v,bool):
-                    if v:
-                        v = 'Yes'
-                    else:
-                        v = 'No'
-                elif v is None:
-                    v = ''
-                else:
-                    v = v
-                print(f'{k:20s}{v}', file=f)
-
-        raise FileNotFoundError(2,"File not found, Created:",fname)
 
     def get(self,parameter):
         if parameter in self.params:
@@ -234,31 +146,546 @@ class ControlClass:
 
             raise ValueError(f"Parameter f{parameter} is mandatory")
 
-        elif parameter in self.opt_defaults:
-            return self.opt_defaults[parameter]
-
-        raise ValueError("Trying to get an undefined parameter")
+        raise ValueError("Trying to get undefined parameter f{parameter}")
 
     def __getitem__(self,key):
         return self.get(key)
 
     def __setitem__(self,key,newvalue):
-        if key in self.params:
-            self.params[key] = newvalue
+        self.params[key] = newvalue
 
-        elif key in self.defaults:
-            self.defaults[key] = newvalue
+#===============================================================================
+# Control parameter verification functions.
+#===============================================================================
+"""
+These are functions meant to be run just after initialization of the
+Control instance.
+Each function checks and ask for correction of errors in the parameter structure
+"""
 
-        elif key in self.opt_defaults:
-            self.opt_defaults[key] = newvalue
+class mustAsk(object):
+    def __repr__(self):
+        return 'MustAsk'
+    def __str__(self):
+        return 'MustAsk'
 
+MustAsk = mustAsk() # A marker for need to ask for parameter.
+
+# The order of parameter reading form commandline in the original version is:
+# TODO: Keep this order for compatibility.
+
+_paramorder =( ('White',('Sigma')),
+               ('Powerlaw',('Kappa','Sigma')),
+               ('Flicker',('Sigma')),
+               ('RandomWalk',('Sigma')),
+               ('GGM',('GGM_1mphi','Kappa','Sigma')),
+               ('VaryingAnnual',('Phi','Sigma')),
+               ('Matern',('Lambda','Kappa','Sigma')),
+               ('AR1',('Phi','Sigma')) )
+
+def _check_stdin_params(control):
+    modelorder = []
+    for model,_ in _paramorder:
+        modelorder.extend(\
+             [ix for ix, v in enumerate(control['NoiseModels']) if v == model]\
+             )
+    for ix in modelorder:
+        model = control['NoiseModels'][ix]
+        for parameter in {i:j for i,j in _paramorder}[model]:
+            if control[parameter] is MustAsk:
+                print(f'Please Specify {parameter} for model type <{model}> : ', end='')
+                parvalue = float(input())
+                control[parameter] = parvalue
+                continue
+            try:
+                if control[parameter][ix] is MustAsk:
+                    print(f'Please Specify {parameter} for model <{ix}:{model}> : ', end='')
+                    parvalue = float(input())
+                    control[parameter][ix] = parvalue
+                    continue
+            except TypeError as t:
+                assert 'subscriptable' in t.args[0] #only get here if control[...] is not a list
+
+    return None
+
+
+def _check_missing_data(control):
+    """
+    if incomplete MissingData specification
+    no missing data is used
+    """
+    # log.warning('Missing data options misspesified, ignoring')
+    if 'MissingData' in control.params and\
+            'PercMissingData' in control.params:
+        pass
+    else:
+        control.params['MissingData'] = False
+        control.params['PercMissingData'] = 0.0
+
+def _check_trend_bias(control):
+    """
+    if incomplete linear terms specification
+    no linear term is used
+    """
+    # log.warning('Linear terms options misspesified, ignoring')
+    if 'Trend' in control.params and\
+            'NominalBias' in control.params:
+        pass
+    else:
+        control.params['Trend'] = 0.0
+        control.params['NominalBias'] = 0.0
+
+
+def _check_sigma(control):
+    """
+    check noise amplitude for any model
+    """
+    EPS = 1.0e-8
+    for ix,nm in enumerate(control.get('NoiseModels')):
+        try:
+            sigma = control.get('Sigma')[ix]
+        except ValueError:
+            control['Sigma'] = [None] * len(control.get('NoiseModels'))
+            sigma = None
+        except IndexError:
+            raise ValueError(f'Sigma parameter list has wrong length, should be at least {ix}')
+
+        if sigma is None:
+            if control.unatended:
+                raise ValueError(f'Should specify noise Amplitude Sigma for noise model {nm}')
+
+            # print(f'Please Specify noise Amplitude Sigma for model <{ix}:{nm}> : ', end='')
+            # sigma = float(input())
+            control.get('Sigma')[ix] = MustAsk
+
+def _check_kappa(control):
+    """
+    check kappa parameter for GGM, Powerlaw or Matern Noise models
+    """
+    EPS = 1.0e-8
+    for ix,nm in enumerate(control.get('NoiseModels')):
+        if nm in ['Powerlaw', 'GGM', 'Matern']:
+            try:
+                kappa = control.get('Kappa')[ix]
+            except ValueError:
+                control['Kappa'] = [None] * len(control.get('NoiseModels'))
+                kappa = None
+            except IndexError:
+                raise ValueError(f'Kappa parameter list has wrong length, should be at least {ix}')
+
+            if nm == 'Matern':
+                try:
+                    kappa = control.get('kappa_fixed')
+                    control.get('Kappa')[ix] = kappa
+                except ValueError:
+                    pass
+
+            if kappa is None:
+                if control.unatended:
+                    raise ValueError(f'Should specify Spectral index kappa for noise model {nm}')
+
+                # print(f'Please Specify Spectral index kappa for model <{ix}:{nm}> : ', end='')
+                # kappa = float(input())
+                control.get('Kappa')[ix] = MustAsk
+
+            else:
+                if (nm in ['Powerlaw', 'GGM']) and (kappa<-2.0-EPS or kappa>2.0+EPS):
+                    raise ValueError('kappa shoud lie between -2 and 2 : {0:f}'.format(kappa))
+                elif nm == 'Matern' and (kappa > -0.5):
+                    # The cited paper on Matern processes limits alfa to > 0.5,
+                    # implying this.
+                    raise ValueError('kappa shoud be lower than -0.5 : {0:f}'.format(kappa))
+
+def _check_lambda(control):
+    """
+    check kappa parameter for Matern Noise models
+    """
+    EPS = 1.0e-8
+    for ix,nm in enumerate(control.get('NoiseModels')):
+        if nm == 'Matern':
+            try:
+                lamba = control.get('Lambda')[ix]
+            except ValueError:
+                control['Lambda'] = [None] * len(control.get('NoiseModels'))
+                lamba = None
+            except IndexError:
+                raise ValueError(f'Lambda parameter list has wrong length, should be at least {ix}')
+
+            try:
+                lamba = control.get('lambda_fixed')
+                control.get('Lambda')[ix] = lamba
+            except ValueError:
+                pass
+
+            if lamba is None:
+                if control.unatended:
+                    raise ValueError(f'Should specify Lambda parameter for noise model {nm}')
+
+                # print(f'Please Specify Lambda Parameter for model <{ix}:{nm}> : ', end='')
+                # lamba = float(input())
+                control.get('Lambda')[ix] = MustAsk
+            elif (lamba < EPS):
+                # The cited paper on Matern processes limits lambda to be
+                # positive
+                raise ValueError(f'Lambda should be positive : {lamba:f}')
+
+def _check_phi(control):
+    """
+    check Phi parameter for AR1 or VaryingAnual Noise models
+    """
+    EPS = 1.0e-8
+    for ix,nm in enumerate(control.get('NoiseModels')):
+        if nm in ['AR1','VaryingAnual']:
+            try:
+                phi = control.get('Phi')[ix]
+            except ValueError:
+                    control['Phi'] = [None] * len(control.get('NoiseModels'))
+                    phi = None
+            except IndexError:
+                if isinstance( (phi := control.get('Phi'))
+                              ,float):
+                    control['Phi'] = [phi] * len(control.get('NoiseModels'))
+                else:
+                    raise ValueError(f'Phi parameter list has wrong length, should be at least {ix}')
+
+            try:
+                phi = control.get('phi_fixed')
+                control.get('Phi')[ix] = lamba
+            except ValueError:
+                pass
+
+            if phi is None:
+                if control.unatended:
+                    raise ValueError(f'Should specify Phi parameter for noise model {nm}')
+
+                #print(f'Please Specify Phi Parameter for model <{ix}:{nm}> : ', end='')
+                #phi = float(input())
+                control.get('Phi')[ix] = MustAsk
+
+
+def _check_ggmphi(control):
+    """
+    check 1-phi parameter for GGM Noise models
+    """
+    EPS = 1.0e-8
+    for ix,nm in enumerate(control.get('NoiseModels')):
+        if nm == 'GGM':
+            try:
+                phi = control.get('GGM_1mphi')[ix]
+            except ValueError:
+                    control['GGM_1mphi'] = [None] * len(control.get('NoiseModels'))
+                    phi = None
+            except (IndexError, TypeError):
+                if isinstance( (phi := control.get('GGM_1mphi'))
+                              ,float):
+                    control['GGM_1mphi'] = [phi] * len(control.get('NoiseModels'))
+                else:
+                    raise ValueError(f'GGM 1-phi parameter list has wrong length, should be at least {ix}')
+
+            if phi is None:
+                if control.unatended:
+                    raise ValueError(f'Should specify 1-phi parameter for noise model {nm}')
+
+                # print(f'Please Specify 1-phi Parameter for model <{ix}:{nm}> : ', end='')
+                # phi = float(input())
+                control.get('GGM_1mphi')[ix] = MustAsk
+
+            elif phi<0.0 or phi>1.0+EPS:
+                # The cited paper on Matern processes limits lambda to be
+                # positive
+                raise ValueError(f'1-phi should lie between 0 and 1: : {phi:f}')
+
+def _check_noise_models_is_list(control):
+    """
+    Ensure NoiseModels is a list
+    """
+    if not isinstance(nm := control.get('NoiseModels'),list):
+        control['NoiseModels'] = [nm]
+
+#
+# ================================================================
+#  Parsear el archivo .ctl y generar el mismo dict que desde toml
+# ================================================================
+#
+
+
+control_defaults = {
+        'SimulationDir':None,
+        'SimulationLabel':None,
+        'TS_format':'mom',
+        'NumberOfSimulations':1,
+        'NumberOfPoints':365,
+        'SamplingPeriod':1,
+        'TimeNoiseStart':0,
+        'NoiseModels':None,
+        'RepeatableNoise':False,
+        'MissingData':False,
+        'PercMissingData':0.0,
+        'Offsets':False,
+        'Trend':0,
+        'NominalBias':0,
+        'AnnualSignal':0}
+
+_general_params = [
+        'NumberOfSimulations',
+        'NumberOfPoints',
+        'TimeNoiseStart',
+        'SamplingPeriod',
+        'RepeatableNoise',
+        'MissingData',
+        'PercMissingData',
+        'Offsets',
+        'Trend',
+        'NominalBias',
+        'AnnualSignal']
+
+
+_file_config_params = [
+        'SimulationDir',
+        'SimulationLabel',
+        'TS_format']
+
+
+# model specific parameters
+
+_paramlist = {'White':('NumberOfPoints','Sigma'),
+              'Powerlaw':('NumberOfPoints','Sigma','Kappa','TS_format','SamplingPeriod'),
+              'Flicker':('NumberOfPoints','Sigma','TS_format','SamplingPeriod'),
+              'RandomWalk':('NumberOfPoints','Sigma','TS_format','SamplingPeriod'),
+              'GGM':('NumberOfPoints','Sigma','Kappa','GGM_1mphi','TS_format','SamplingPeriod'),
+              'VaryingAnnual':('NumberOfPoints','Sigma','Phi','TS_format','SamplingPeriod'),
+              'Matern':('NumberOfPoints','Sigma','Lambda','Kappa'),
+              'AR1':('NumberOfPoints','Sigma','Phi')}
+
+# TODO: nuevos nombres para las variables, preferentemente con prefijo
+_param_conversion = {'NumberOfPoints':'m',
+                     'TS_format':'units',
+                     'SamplingPeriod':'dt',
+                     'GGM_1mphi':'one_minus_phi',
+                     'Lambda':'lamba'}
+
+_param_conversion_r = {v:k for k,v in _param_conversion.items()}
+
+def get_nm_parameter(ix,model,control,parameter):
+    if parameter == 'NumberOfPoints':
+        return control['NumberOfPoints']
+    if parameter == 'Sigma':
+        return control['Sigma'][ix]
+    if parameter == 'Kappa':
+        if model == 'Matern':
+            try:
+                return control['kappa_fixed']
+            except (ValueError,KeyError):
+                pass
+        return control['Kappa'][ix]
+    if parameter == 'TS_format':
+        return control['TS_format']
+    if parameter == 'SamplingPeriod':
+        return control['SamplingPeriod']
+    if parameter == 'GGM_1mphi':
+        if isinstance((ggm := control['GGM_1mphi']),list):
+            return ggm[ix]
         else:
-            # if unexistent, assign high priority
-            self.params[key] = newvalue
+            return ggm
+    if parameter == 'Phi':
+        if model == 'VaryingAnnual':
+            try:
+                return control['phi_fixed']
+            except (ValueError,KeyError):
+                pass
+        return control['Phi'][ix]
+    if parameter == 'Lambda':
+        if model == 'Matern':
+            try:
+                return control['lambda_fixed']
+            except (ValueError,KeyError):
+                pass
+        return control['Lambda'][ix]
 
-class Control(ControlClass,metaclass=SingletonMeta):
+    raise KeyError(f'Incorrect parameter {parameter} for required model {model}')
+
+def get_noisemodels(control):
+    models = control["NoiseModels"]
+    if not isinstance(models,list):
+        models = [models]
+
+    rmodels = []
+
+    for ix,model in enumerate(models):
+        params = {}
+        # iterate over model_specific parameters
+        for p in _paramlist[model]:
+            # some parameters are renamed
+            if p in _param_conversion:
+                k = _param_conversion[p]
+            # other are only lowered
+            else:
+                k = p.lower()
+            # get and store each parameter
+            params[k] = get_nm_parameter(ix,model,control,p)
+        rmodels.append( (model,
+                         params) )
+
+    return rmodels
+
+def parse_retro_ctl(fname):
+    checks = [
+            _check_missing_data,
+            _check_trend_bias,
+            _check_noise_models_is_list,
+            _check_lambda,
+            _check_kappa,
+            _check_sigma,
+            _check_ggmphi,
+            _check_phi,
+            _check_stdin_params,
+            _check_lambda, # repeat boundary checks.
+            _check_kappa, # repeat boundary checks.
+            _check_sigma, # repeat boundary checks.
+            _check_ggmphi, # repeat boundary checks.
+            _check_phi # repeat boundary checks.
+             ]
+
+    # Parsear el control File
+    control = Control(fname,control_defaults)
+
+    # Correr los chequeos y pedir entrada del usuario
+    for check in checks:
+        check(control)
+
+    # tiramos la Clase molesta a la basura, queda el dict.
+    control = control.params
+
+    # Empezamos a formatear el diccionario igual que si viniera del toml
+    new_control = {'file_config': {k:v for k,v in control.items() \
+                                       if k in _file_config_params},
+                   'general': {k:v for k,v in control.items() \
+                                   if k in _general_params},
+                   'NoiseModels': {k:{} for k in control['NoiseModels']}
+                   }
+
+    # Iteramos sobre los modelos
+    for model,params in get_noisemodels(control):
+
+        #OJO: cada tipo de modelo puede estar repetido.
+        models_count= len(new_control['NoiseModels'][model])
+        #OJO: en vez de params en el modelo va un contador.
+        k = f'{models_count+1}'
+
+        new_control['NoiseModels'][model][k] = params
+
+    return new_control
+
+from itertools import chain
+
+def dict_to_ctl(control_data):
     """
-    Class to store parameters that prescribe how the analysis should be done,
-    Singleton Version in order to share configuration between routines.
+    convert new formatted dir to ctl formatted string
     """
-    pass
+    lines = [f"{k:20}{v}" for k,v in control_data['file_config'].items() ]
+    lines.extend([f"{k:20}{v}" for k,v in control_data['general'].items() ])
+
+    # Obvio que hay formas menos villeras de hacer esto, pero la idea es
+    # que cada tipo de modelo puede estar más de una vez. Y no tengo tiempo de
+    # pensar ahora.
+    noise_models = [[k]*len(v) for k,v in control_data['NoiseModels'].items() ]
+    noise_models = [*chain(*noise_models)]
+
+    lines.append("{:20}{}".format("NoiseModels",
+                                  ' '.join(noise_models)))
+
+    """
+    # Hay tres parámetros de los modelos de ruido que pueden pasarse
+    # por el archivo .ctl si son iguales para todos los modelos de su tipo.
+    # Pordíamos setearlos con algo así:
+
+    if 'GGM' in control_data['NoiseModels']:
+        one_minus_phi_params = [i['one_minus_phi'] for i in \
+                                control_data['NoiseModels']['GGM'].values()]
+        if len(set(one_minus_phi_params)) == 1:
+            lines.append("{:20}{}".format("GGM_1mphi",one_minus_phi_params[0]))
+
+    if 'Matern' in control_data['NoiseModels']:
+        lambda_params = [i['lamba'] for i in \
+                                control_data['NoiseModels']['Matern'].values()]
+        if len(set(lambda_params)) == 1:
+            lines.append("{:20}{}".format("lambda_fixed",lambda_params[0]))
+
+        kappa_params = [i['kappa'] for i in \
+                                control_data['NoiseModels']['Matern'].values()]
+        if len(set(kappa_params)) == 1:
+            lines.append("{:20}{}".format("kappa_fixed",kappa_params[0]))
+
+    if 'VaryingAnnual' in control_data['NoiseModels']:
+        phi_params = [i['phi'] for i in \
+                                control_data['NoiseModels']['VaryingAnnual'].values()]
+        if len(set(phi_params)) == 1:
+            lines.append("{:20}{}".format("phi_fixed",phi_params[0]))
+
+    # Sin embargo, la idea es que en el toml los parámetros estén especificados
+    # independientemente para cada modelo, asique los vamos a tratar como
+    # parámetros para línea de comandos.
+    """
+
+    # El resto de los parámetros se pasan por línea de commandos.
+    _paramorder_new ={ 'White':('sigma'),
+                       'Powerlaw':('kappa','sigma'),
+                       'Flicker':('sigma'),
+                       'RandomWalk':('sigma'),
+                       'GGM':('one_minus_phi','kappa','sigma'),
+                       'VaryingAnnual':('phi','sigma'),
+                       'Matern':('lamba','kappa','sigma'),
+                       'AR1':('phi','sigma') }
+
+    cli_options = []
+
+    for model in noise_models:
+        params = control_data['NoiseModels'][model].values()
+        for p in params:
+            # Si usaramos los parámetros opcionales _fixed o GGM_1mphi del
+            # .ctl, deberíamos chequear aparte acá para no repetir. Un lío
+            cli_options.extend([p[i] for i in _paramorder_new[model]])
+
+    return lines, cli_options
+
+
+"""
+Usage: python -m eletor.control [-I] <file1> <file2> ....
+
+Convert .ctl files to .toml
+
+-I: inverse conversion. Output ctl and .cli file with cli parameters.
+
+"""
+
+if __name__ == '__main__':
+    import sys
+    import toml
+    from pathlib import Path
+
+    files = [i for i in sys.argv[1:] if i[0] != '-']
+
+    if '-I' in sys.argv[1:]:
+        for arg in files:
+            fname = Path(arg)
+            with fname.with_suffix('.toml').open('r') as f:
+                control_data = toml.load(f)
+            lines, cli = dict_to_ctl(control_data)
+
+            with fname.with_suffix('.ctl').open('w') as f:
+                f.writelines(map(lambda x: x+'\n', lines))
+
+            with fname.with_suffix('.cli').open('w') as f:
+                f.writelines(map('{}\n'.format, cli))
+
+        print("Generated .ctl and .cli files.")
+        print("Run hector using:")
+        print("simulatenoise -i {} < {}".format(fname.with_suffix('.ctl'),
+                                                fname.with_suffix('.cli')))
+
+    else:
+        for arg in files:
+            fname = Path(arg)
+            control_data = parse_retro_ctl(fname)
+            with fname.with_suffix('.toml').open('w') as f:
+                toml.dump(control_data,f)
