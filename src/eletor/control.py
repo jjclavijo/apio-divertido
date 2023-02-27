@@ -429,6 +429,7 @@ control_defaults = {
 _general_params = [
         'NumberOfSimulations',
         'NumberOfPoints',
+        'TimeNoiseStart',
         'SamplingPeriod',
         'RepeatableNoise',
         'MissingData',
@@ -462,6 +463,8 @@ _param_conversion = {'NumberOfPoints':'m',
                      'SamplingPeriod':'dt',
                      'GGM_1mphi':'one_minus_phi',
                      'Lambda':'lamba'}
+
+_param_conversion_r = {v:k for k,v in _param_conversion.items()}
 
 def get_nm_parameter(ix,model,control,parameter):
     if parameter == 'NumberOfPoints':
@@ -573,3 +576,116 @@ def parse_retro_ctl(fname):
 
     return new_control
 
+from itertools import chain
+
+def dict_to_ctl(control_data):
+    """
+    convert new formatted dir to ctl formatted string
+    """
+    lines = [f"{k:20}{v}" for k,v in control_data['file_config'].items() ]
+    lines.extend([f"{k:20}{v}" for k,v in control_data['general'].items() ])
+
+    # Obvio que hay formas menos villeras de hacer esto, pero la idea es
+    # que cada tipo de modelo puede estar más de una vez. Y no tengo tiempo de
+    # pensar ahora.
+    noise_models = [[k]*len(v) for k,v in control_data['NoiseModels'].items() ]
+    noise_models = [*chain(*noise_models)]
+
+    lines.append("{:20}{}".format("NoiseModels",
+                                  ' '.join(noise_models)))
+
+    """
+    # Hay tres parámetros de los modelos de ruido que pueden pasarse
+    # por el archivo .ctl si son iguales para todos los modelos de su tipo.
+    # Pordíamos setearlos con algo así:
+
+    if 'GGM' in control_data['NoiseModels']:
+        one_minus_phi_params = [i['one_minus_phi'] for i in \
+                                control_data['NoiseModels']['GGM'].values()]
+        if len(set(one_minus_phi_params)) == 1:
+            lines.append("{:20}{}".format("GGM_1mphi",one_minus_phi_params[0]))
+
+    if 'Matern' in control_data['NoiseModels']:
+        lambda_params = [i['lamba'] for i in \
+                                control_data['NoiseModels']['Matern'].values()]
+        if len(set(lambda_params)) == 1:
+            lines.append("{:20}{}".format("lambda_fixed",lambda_params[0]))
+
+        kappa_params = [i['kappa'] for i in \
+                                control_data['NoiseModels']['Matern'].values()]
+        if len(set(kappa_params)) == 1:
+            lines.append("{:20}{}".format("kappa_fixed",kappa_params[0]))
+
+    if 'VaryingAnnual' in control_data['NoiseModels']:
+        phi_params = [i['phi'] for i in \
+                                control_data['NoiseModels']['VaryingAnnual'].values()]
+        if len(set(phi_params)) == 1:
+            lines.append("{:20}{}".format("phi_fixed",phi_params[0]))
+
+    # Sin embargo, la idea es que en el toml los parámetros estén especificados
+    # independientemente para cada modelo, asique los vamos a tratar como
+    # parámetros para línea de comandos.
+    """
+
+    # El resto de los parámetros se pasan por línea de commandos.
+    _paramorder_new ={ 'White':('sigma'),
+                       'Powerlaw':('kappa','sigma'),
+                       'Flicker':('sigma'),
+                       'RandomWalk':('sigma'),
+                       'GGM':('one_minus_phi','kappa','sigma'),
+                       'VaryingAnnual':('phi','sigma'),
+                       'Matern':('lamba','kappa','sigma'),
+                       'AR1':('phi','sigma') }
+
+    cli_options = []
+
+    for model in noise_models:
+        params = control_data['NoiseModels'][model].values()
+        for p in params:
+            # Si usaramos los parámetros opcionales _fixed o GGM_1mphi del
+            # .ctl, deberíamos chequear aparte acá para no repetir. Un lío
+            cli_options.extend([p[i] for i in _paramorder_new[model]])
+
+    return lines, cli_options
+
+
+"""
+Usage: python -m eletor.control [-I] <file1> <file2> ....
+
+Convert .ctl files to .toml
+
+-I: inverse conversion. Output ctl and .cli file with cli parameters.
+
+"""
+
+if __name__ == '__main__':
+    import sys
+    import toml
+    from pathlib import Path
+
+    files = [i for i in sys.argv[1:] if i[0] != '-']
+
+    if '-I' in sys.argv[1:]:
+        for arg in files:
+            fname = Path(arg)
+            with fname.with_suffix('.toml').open('r') as f:
+                control_data = toml.load(f)
+            lines, cli = dict_to_ctl(control_data)
+
+            with fname.with_suffix('.ctl').open('w') as f:
+                f.writelines(map(lambda x: x+'\n', lines))
+
+            with fname.with_suffix('.cli').open('w') as f:
+                f.writelines(map('{}\n'.format, cli))
+
+        print("Generated .ctl and .cli files.")
+        print("Run hector using:")
+        print("simulatenoise -i {} < {}".format(fname.with_suffix('.ctl'),
+                                                fname.with_suffix('.cli')))
+
+    else:
+        for arg in files:
+            fname = Path(arg)
+            control_data = parse_retro_ctl(fname)
+            with fname.with_suffix('.toml').open('w') as f:
+                toml.dump(control_data,f)

@@ -31,7 +31,7 @@ from scipy import signal
 from pathlib import Path
 from scipy.special import kv
 
-from eletor.control import Control, parse_retro_ctl
+#from eletor.control import Control, parse_retro_ctl
 from eletor.observations import Observations
 
 from eletor import create_hs
@@ -222,14 +222,15 @@ def main():
     #--- Read control parameters into dictionary (singleton class)
     try:
         if fname.suffix == '.ctl':
-            control = parse_retro_ctl(fname)
+            #control = parse_retro_ctl(fname)
+            raise TypeError('.ctl files not supported: convert to toml using converion utility.')
         else:
-            toml.load(fname)
+            control = toml.load(fname)
 
     except FileNotFoundError:
         print(f'Control file {fname} not found')
         return 2 # Exit with errorcode 2: file not found
-    except (ValueError, toml.TomlDecodeError):
+    except (toml.TomlDecodeError):
         print(f'Error parsing {fname}:',e)
         return 1 # Exit with: Operation not permitted
     except TypeError:
