@@ -11,6 +11,7 @@ MissingData = false
 PercMissingData = 0.0
 Trend = 0.0
 NominalBias = 0.0
+TimeNoiseStart = 0
 
 [NoiseModels.Matern.1]
 m = 6556
