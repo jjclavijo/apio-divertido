@@ -19,6 +19,8 @@
 
 import os
 import sys
+from pathlib import Path
+import toml
 
 #==============================================================================
 # Class definition
@@ -648,6 +650,26 @@ def dict_to_ctl(control_data):
 
     return lines, cli_options
 
+def toml_to_ctl_cli(fname,dirname=None):
+    fname = Path(fname)
+    with fname.with_suffix('.toml').open('r') as f:
+        control_data = toml.load(f)
+    lines, cli = dict_to_ctl(control_data)
+
+    if not dirname is None:
+        directory = Path(dirname)
+        if not directory.is_dir():
+            raise ValueError("bad directory")
+        fname = directory/fname.name
+
+    print(fname)
+    with fname.with_suffix('.ctl').open('w') as f:
+        f.writelines(map(lambda x: x+'\n', lines))
+
+    with fname.with_suffix('.cli').open('w') as f:
+        f.writelines(map('{}\n'.format, cli))
+
+    return 0
 
 """
 Usage: python -m eletor.control [-I] <file1> <file2> ....
@@ -667,16 +689,7 @@ if __name__ == '__main__':
 
     if '-I' in sys.argv[1:]:
         for arg in files:
-            fname = Path(arg)
-            with fname.with_suffix('.toml').open('r') as f:
-                control_data = toml.load(f)
-            lines, cli = dict_to_ctl(control_data)
-
-            with fname.with_suffix('.ctl').open('w') as f:
-                f.writelines(map(lambda x: x+'\n', lines))
-
-            with fname.with_suffix('.cli').open('w') as f:
-                f.writelines(map('{}\n'.format, cli))
+            toml_to_ctl_cli(arg)
 
         print("Generated .ctl and .cli files.")
         print("Run hector using:")
