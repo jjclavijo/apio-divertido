@@ -178,7 +178,13 @@ units="mom" # TS-format
 """
 
     control_data = toml.loads(toml_string)
-    y = hps.create_noise_(control_data)
+    #y = hps.create_noise_(control_data)
+    y = hps.create_noise(
+            control_data['general']['NumberOfPoints'],
+            control_data['general']['SamplingPeriod'],
+            control_data['general']['TimeNoiseStart'],
+            control_data['NoiseModels'],
+            None)
 
     assert len(y) == 100
 
@@ -247,7 +253,13 @@ units="mom" # TS-format
     print("New control structure: ")
     print(control_data)
 
-    y = hps.create_noise_(control_data,rng=np.random.default_rng(0))
+    #y = hps.create_noise_(control_data,rng=np.random.default_rng(0))
+    y = hps.create_noise(
+            control_data['general']['NumberOfPoints'],
+            control_data['general']['SamplingPeriod'],
+            control_data['general']['TimeNoiseStart'],
+            control_data['NoiseModels'],
+            np.random.default_rng(0))
     assert 1==1
 
     ## LOGGER.info(f"nuevo: {len(y)}, viejo: {len(noise)}")
@@ -318,7 +330,13 @@ units="mom" # TS-format
     print(control_data)
 
     #y = hps.create_noise(m,dt,0,[('GGM',m,sigma,kappa,one_minus_phi,'mom',dt)],rng=np.random.default_rng(0))
-    y = hps.create_noise_(control_data,rng=np.random.default_rng(0))
+    #y = hps.create_noise_(control_data,rng=np.random.default_rng(0))
+    y = hps.create_noise(
+            control_data['general']['NumberOfPoints'],
+            control_data['general']['SamplingPeriod'],
+            control_data['general']['TimeNoiseStart'],
+            control_data['NoiseModels'],
+            np.random.default_rng(0))
     # LOGGER.info(f"nuevo: {len(y)}, viejo: {len(noise)}")
     # LOGGER.info(cm.mock_calls)
     # LOGGER.info(mparams.mock_calls)
@@ -385,7 +403,13 @@ units="{units}" # TS-format
 spectral_density=0.01
 """
     control_data = toml.loads(toml_string)
-    y = hps.create_noise_(control_data,rng=np.random.default_rng(0))
+    #y = hps.create_noise_(control_data,rng=np.random.default_rng(0))
+    y = hps.create_noise(
+            control_data['general']['NumberOfPoints'],
+            control_data['general']['SamplingPeriod'],
+            control_data['general']['TimeNoiseStart'],
+            control_data['NoiseModels'],
+            np.random.default_rng(0))
     differ = (y - noise.noise.values)
     assert len(y) == len(noise.noise.values)
     assert all(differ < 1e-4)
@@ -434,7 +458,13 @@ units="{units}" # TS-format
 spectral_density=0.01
 """
     control_data = toml.loads(toml_string)
-    y = hps.create_noise_(control_data,rng=np.random.default_rng(0))
+    #y = hps.create_noise_(control_data,rng=np.random.default_rng(0))
+    y = hps.create_noise(
+            control_data['general']['NumberOfPoints'],
+            control_data['general']['SamplingPeriod'],
+            control_data['general']['TimeNoiseStart'],
+            control_data['NoiseModels'],
+            np.random.default_rng(0))
 
     differ = (y - noise.noise.values)
     assert all(differ < 1e-5)
