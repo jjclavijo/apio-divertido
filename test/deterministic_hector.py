@@ -16,7 +16,7 @@ import logging
 LOGGER = logging.getLogger(__name__)
 
 import hectorp.simulatenoise
-import eletor.control
+import eletor.compat
 
 from array import array
 from itertools import cycle,islice
@@ -55,7 +55,7 @@ def call_hector(controlfile,stdinput):
 def main(commandfile):
     for file in commandfile:
         with tempfile.TemporaryDirectory() as tmpdir:
-            eletor.control.toml_to_ctl_cli(file,tmpdir)
+            eletor.compat.toml_to_ctl_cli(file,tmpdir)
             fname = Path(tmpdir) / Path(file.name).with_suffix('.ctl')
             fcli = fname.with_suffix('.cli')
             with open(fcli,'r') as f:
