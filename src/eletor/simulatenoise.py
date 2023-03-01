@@ -71,12 +71,13 @@ def simulate_noise(control):
        os.makedirs(directory)
 
     #--- Create time array. Default time format is mom
+    # Dejo el if-else para que nos acordemos que esto tiene que
+    # Cambiar.
     if control['file_config'].get('TS_format','mom') == 'mom':
         t0 = 51544.0
         t = np.linspace(t0,t0+m*dt,m,endpoint=False)
-
-    elif control['file_config']['TS_format'] == 'msf':
-        t = np.linspace(0,m*dt,m,endpoint=False)
+    else:
+        raise NotImplementedError
 
     # En algún momento a alguien le pareció útil pensar que el índice de
     # tiempos había que tener la posibilidad de leerlo de un archivo de datos.
@@ -96,7 +97,8 @@ def simulate_noise(control):
         #y += create_noise_(control,rng)
         y += create_noise(m,dt,ms,noiseModels,rng)
 
-        momwrite(y,t,dt,'salida.mom')
+        #--- TODO: not always write mom files
+        momwrite(y,t,dt,fname)
 
     #--- Show time lapsed
     print("--- {0:8.3f} seconds ---\n".format(float(time.time() - start_time)))
