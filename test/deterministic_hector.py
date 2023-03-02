@@ -18,16 +18,18 @@ LOGGER = logging.getLogger(__name__)
 import hectorp.simulatenoise
 import eletor.compat
 
-from array import array
-from itertools import cycle,islice
-import numpy as np
+from eletor.not_rng import rng
 
-with open('10000Random.dat','rb') as f:
-    _10000_random = array('d')
-    _10000_random.fromfile(f,10000)
-
-def rng(size):
-    return np.array([*islice(cycle(_10000_random),size)])
+# from array import array
+# from itertools import cycle,islice
+# import numpy as np
+#
+# with open('10000Random.dat','rb') as f:
+#     _10000_random = array('d')
+#     _10000_random.fromfile(f,10000)
+#
+# def rng(size):
+#     return np.array([*islice(cycle(_10000_random),size)])
 
 def call_hector(controlfile,stdinput):
     print("Recién llamé")

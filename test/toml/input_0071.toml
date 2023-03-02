@@ -1,0 +1,30 @@
+[file_config]
+TS_format = "mom"
+SimulationDir = "."
+SimulationLabel = "test_71"
+
+[general]
+NumberOfSimulations = 1
+SamplingPeriod = 10.794401135291455
+TimeNoiseStart = 0
+DeterministicNoise = true
+MissingData = false
+PercMissingData = 0.0
+Offsets = false
+Trend = 0
+NominalBias = 0
+AnnualSignal = 0
+NumberOfPoints = 760
+
+[NoiseModels.RandomWalk.0]
+sigma = 6.59782004593063
+m = 760
+units = "mom"
+dt = 10.794401135291455
+
+[NoiseModels.VaryingAnnual.1]
+sigma = 5.671737600305786
+phi = 0.09491201138277487
+m = 760
+units = "mom"
+dt = 10.794401135291455

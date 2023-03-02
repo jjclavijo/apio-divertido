@@ -355,7 +355,11 @@ NROUND = 5
 data = []
 model = "Powerlaw"
 sigma = np.random.uniform(0,10)
+sigma = np.round(sigma,NROUND)
+
 kappa = np.random.uniform(-2,2)
+kappa = np.round(kappa,NROUND)
+
 m = np.random.randint(10,1000)
 dt = np.random.uniform(0.5,20)
 

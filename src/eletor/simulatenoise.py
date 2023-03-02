@@ -202,7 +202,7 @@ def main():
     #--- parse command-line arguments
     fname = Path(args.fname)
 
-    #--- Read control parameters into dictionary (singleton class)
+    #--- Read control parameters into dictionary
     try:
         if fname.suffix == '.ctl':
             #control = parse_retro_ctl(fname)

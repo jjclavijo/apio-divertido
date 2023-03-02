@@ -1,0 +1,24 @@
+[file_config]
+TS_format = "mom"
+SimulationDir = "."
+SimulationLabel = "test_84"
+
+[general]
+NumberOfSimulations = 1
+SamplingPeriod = 3.1320880313690576
+TimeNoiseStart = 0
+DeterministicNoise = true
+MissingData = false
+PercMissingData = 0.0
+Offsets = false
+Trend = 0
+NominalBias = 0
+AnnualSignal = 0
+NumberOfPoints = 228
+
+[NoiseModels.AR1.0]
+sigma = 2.003284989704044
+phi = 0.04503538506505564
+m = 228
+units = "mom"
+dt = 3.1320880313690576

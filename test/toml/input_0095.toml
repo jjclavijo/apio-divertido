@@ -1,0 +1,38 @@
+[file_config]
+TS_format = "mom"
+SimulationDir = "."
+SimulationLabel = "test_95"
+
+[general]
+NumberOfSimulations = 1
+SamplingPeriod = 10.126157852863974
+TimeNoiseStart = 0
+DeterministicNoise = true
+MissingData = false
+PercMissingData = 0.0
+Offsets = false
+Trend = 0
+NominalBias = 0
+AnnualSignal = 0
+NumberOfPoints = 845
+
+[NoiseModels.Matern.0]
+lamba = 0.13728626531970242
+kappa = -1.3721333994951632
+sigma = 5.6350437798511
+m = 845
+units = "mom"
+dt = 10.126157852863974
+
+[NoiseModels.AR1.1]
+sigma = 4.681036702471806
+phi = 0.10770270136646028
+m = 845
+units = "mom"
+dt = 10.126157852863974
+
+[NoiseModels.White.2]
+sigma = 6.883756206034663
+m = 845
+units = "mom"
+dt = 10.126157852863974

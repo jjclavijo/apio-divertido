@@ -1,0 +1,31 @@
+[file_config]
+TS_format = "mom"
+SimulationDir = "."
+SimulationLabel = "test_60"
+
+[general]
+NumberOfSimulations = 1
+SamplingPeriod = 4.4224874774549345
+TimeNoiseStart = 0
+DeterministicNoise = true
+MissingData = false
+PercMissingData = 0.0
+Offsets = false
+Trend = 0
+NominalBias = 0
+AnnualSignal = 0
+NumberOfPoints = 692
+
+[NoiseModels.Powerlaw.0]
+sigma = 8.208002242018694
+kappa = -0.2904051435435817
+m = 692
+units = "mom"
+dt = 4.4224874774549345
+
+[NoiseModels.AR1.1]
+sigma = 7.469754001614217
+phi = 0.254156517885512
+m = 692
+units = "mom"
+dt = 4.4224874774549345

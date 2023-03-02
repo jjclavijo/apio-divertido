@@ -30,8 +30,8 @@ import toml
 
 def cast(string):
     try:
-        casted = literal_eval(string)
-    except ValueError:
+        return literal_eval(string)
+    except (ValueError,SyntaxError):
         # era string o Yes/No
         try:
             return {'yes':True,'no':False}[string.lower()]
@@ -88,37 +88,43 @@ MustAsk = mustAsk() # A marker for "need to ask" for parameter.
 # The order of parameter reading form commandline in the original version is:
 # TODO: Keep this order for compatibility.
 
-_paramorder =( ('White',('Sigma')),
-               ('Powerlaw',('Kappa','Sigma')),
-               ('Flicker',('Sigma')),
-               ('RandomWalk',('Sigma')),
-               ('GGM',('GGM_1mphi','Kappa','Sigma')),
-               ('VaryingAnnual',('Phi','Sigma')),
-               ('Matern',('Lambda','Kappa','Sigma')),
-               ('AR1',('Phi','Sigma')) )
+_parameter_order ={ 'White':['Sigma'],
+                   'Powerlaw':['Kappa','Sigma'],
+                   'Flicker':['Sigma'],
+                   'RandomWalk':['Sigma'],
+                   'GGM':['GGM_1mphi','Kappa','Sigma'],
+                   'VaryingAnnual':['Phi','Sigma'],
+                   'Matern':['Lambda','Kappa','Sigma'],
+                   'AR1':['Phi','Sigma'] }
 
 def _check_stdin_params(control):
-    modelorder = []
-    for model,_ in _paramorder:
-        modelorder.extend(\
-             [ix for ix, v in enumerate(control['NoiseModels']) if v == model]\
-             )
-    for ix in modelorder:
-        model = control['NoiseModels'][ix]
-        for parameter in {i:j for i,j in _paramorder}[model]:
+    """
+    Pide parámetros por línea de comandos si es necesario.
+    """
+
+    # Para cada modelo especificado
+    for ix,model in enumerate(control['NoiseModels']):
+        # Preguntar los parámetros en el mismo orden
+        # que hector lo haría
+        for parameter in _parameter_order[model]:
+            # Si tenemos anotado que hay que preguntar
+            # Y es un paámetro global
             if control[parameter] is MustAsk:
                 print(f'Please Specify {parameter} for model type <{model}> : ', end='')
                 parvalue = float(input())
                 control[parameter] = parvalue
                 continue
             try:
+                # Si era un parámetro de lista, porque hay uno por modelo
                 if control[parameter][ix] is MustAsk:
+                    # Si anotamos preguntar
                     print(f'Please Specify {parameter} for model <{ix}:{model}> : ', end='')
                     parvalue = float(input())
                     control[parameter][ix] = parvalue
                     continue
             except TypeError as t:
-                assert 'subscriptable' in t.args[0] #only get here if control[...] is not a list
+                #only get here if control[...] is not a list
+                assert 'subscriptable' in t.args[0]
 
     return None
 
@@ -129,12 +135,12 @@ def _check_missing_data(control):
     no missing data is used
     """
     # log.warning('Missing data options misspesified, ignoring')
-    if 'MissingData' in control.params and\
-            'PercMissingData' in control.params:
+    if 'MissingData' in control and\
+            'PercMissingData' in control:
         pass
     else:
-        control.params['MissingData'] = False
-        control.params['PercMissingData'] = 0.0
+        control['MissingData'] = False
+        control['PercMissingData'] = 0.0
 
 def _check_trend_bias(control):
     """
@@ -142,13 +148,42 @@ def _check_trend_bias(control):
     no linear term is used
     """
     # log.warning('Linear terms options misspesified, ignoring')
-    if 'Trend' in control.params and\
-            'NominalBias' in control.params:
+    if 'Trend' in control and\
+            'NominalBias' in control:
         pass
     else:
-        control.params['Trend'] = 0.0
-        control.params['NominalBias'] = 0.0
+        control['Trend'] = 0.0
+        control['NominalBias'] = 0.0
 
+_paramorder ={ 'White':('Sigma'),
+               'Powerlaw':('Kappa','Sigma'),
+               'Flicker':('Sigma'),
+               'RandomWalk':('Sigma'),
+               'GGM':('GGM_1mphi','Kappa','Sigma'),
+               'VaryingAnnual':('Phi','Sigma'),
+               'Matern':('Lambda','Kappa','Sigma'),
+               'AR1':('Phi','Sigma') }
+
+def _chech_parameter_list_lengths(control):
+    parameters = ['Sigma']
+    models = control['NoiseModels']
+
+    if set(models).intersection(('Powerlaw','GGM','Matern')):
+        parameters.append('Kappa')
+
+    if set(models).intersection('AR1','VaryingAnnual'):
+        parameters.append('Phi')
+
+    if 'Matern' in models:
+        parameters.append('Lambda')
+
+    for parameter in parameters:
+        try:
+            param = control[parameter][ix]
+        except KeyError: #no parameter
+            control[parameter] = [None] * len(models)
+        except IndexError: # list index failed
+            raise ValueError(f'{parameter} parameter list has wrong length, should be at least {ix}')
 
 def _check_sigma(control):
     """
@@ -156,21 +191,13 @@ def _check_sigma(control):
     """
     EPS = 1.0e-8
     for ix,nm in enumerate(control.get('NoiseModels')):
-        try:
-            sigma = control.get('Sigma')[ix]
-        except ValueError:
-            control['Sigma'] = [None] * len(control.get('NoiseModels'))
-            sigma = None
-        except IndexError:
-            raise ValueError(f'Sigma parameter list has wrong length, should be at least {ix}')
+        sigma = control['Sigma'][ix]
 
         if sigma is None:
-            if control.unatended:
+            if control.get('unatended',False):
                 raise ValueError(f'Should specify noise Amplitude Sigma for noise model {nm}')
 
-            # print(f'Please Specify noise Amplitude Sigma for model <{ix}:{nm}> : ', end='')
-            # sigma = float(input())
-            control.get('Sigma')[ix] = MustAsk
+            control['Sigma'][ix] = MustAsk
 
 def _check_kappa(control):
     """
@@ -179,28 +206,21 @@ def _check_kappa(control):
     EPS = 1.0e-8
     for ix,nm in enumerate(control.get('NoiseModels')):
         if nm in ['Powerlaw', 'GGM', 'Matern']:
-            try:
-                kappa = control.get('Kappa')[ix]
-            except ValueError:
-                control['Kappa'] = [None] * len(control.get('NoiseModels'))
-                kappa = None
-            except IndexError:
-                raise ValueError(f'Kappa parameter list has wrong length, should be at least {ix}')
-
             if nm == 'Matern':
+                # Mattern noise admits kappa parameter in .ctl
                 try:
-                    kappa = control.get('kappa_fixed')
-                    control.get('Kappa')[ix] = kappa
-                except ValueError:
+                    kappa = control['kappa_fixed']
+                    control['Kappa'][ix] = kappa
+                except KeyError:
                     pass
 
+            kappa = control['Kappa'][ix]
+
             if kappa is None:
-                if control.unatended:
+                if control.get('unatended',False):
                     raise ValueError(f'Should specify Spectral index kappa for noise model {nm}')
 
-                # print(f'Please Specify Spectral index kappa for model <{ix}:{nm}> : ', end='')
-                # kappa = float(input())
-                control.get('Kappa')[ix] = MustAsk
+                control['Kappa'][ix] = MustAsk
 
             else:
                 if (nm in ['Powerlaw', 'GGM']) and (kappa<-2.0-EPS or kappa>2.0+EPS):
@@ -212,32 +232,25 @@ def _check_kappa(control):
 
 def _check_lambda(control):
     """
-    check kappa parameter for Matern Noise models
+    check lambda parameter for Matern Noise models
     """
     EPS = 1.0e-8
     for ix,nm in enumerate(control.get('NoiseModels')):
         if nm == 'Matern':
             try:
-                lamba = control.get('Lambda')[ix]
-            except ValueError:
-                control['Lambda'] = [None] * len(control.get('NoiseModels'))
-                lamba = None
-            except IndexError:
-                raise ValueError(f'Lambda parameter list has wrong length, should be at least {ix}')
-
-            try:
-                lamba = control.get('lambda_fixed')
+                lamba = control['lambda_fixed']
                 control.get('Lambda')[ix] = lamba
-            except ValueError:
+            except KeyError:
                 pass
 
+            lamba = control['Lambda'][ix]
+
             if lamba is None:
-                if control.unatended:
+                if control.get('unatended',False):
                     raise ValueError(f'Should specify Lambda parameter for noise model {nm}')
 
-                # print(f'Please Specify Lambda Parameter for model <{ix}:{nm}> : ', end='')
-                # lamba = float(input())
                 control.get('Lambda')[ix] = MustAsk
+
             elif (lamba < EPS):
                 # The cited paper on Matern processes limits lambda to be
                 # positive
@@ -250,26 +263,17 @@ def _check_phi(control):
     EPS = 1.0e-8
     for ix,nm in enumerate(control.get('NoiseModels')):
         if nm in ['AR1','VaryingAnual']:
-            try:
-                phi = control.get('Phi')[ix]
-            except ValueError:
-                    control['Phi'] = [None] * len(control.get('NoiseModels'))
-                    phi = None
-            except IndexError:
-                if isinstance( (phi := control.get('Phi'))
-                              ,float):
-                    control['Phi'] = [phi] * len(control.get('NoiseModels'))
-                else:
-                    raise ValueError(f'Phi parameter list has wrong length, should be at least {ix}')
+            if nm == 'VaryingAnual':
+                try:
+                    phi = control.get('phi_fixed')
+                    control['Phi'][ix] = phi
+                except ValueError:
+                    pass
 
-            try:
-                phi = control.get('phi_fixed')
-                control.get('Phi')[ix] = lamba
-            except ValueError:
-                pass
+            phi = control['Phi'][ix]
 
             if phi is None:
-                if control.unatended:
+                if control.get('unatended',False):
                     raise ValueError(f'Should specify Phi parameter for noise model {nm}')
 
                 #print(f'Please Specify Phi Parameter for model <{ix}:{nm}> : ', end='')
@@ -285,19 +289,17 @@ def _check_ggmphi(control):
     for ix,nm in enumerate(control.get('NoiseModels')):
         if nm == 'GGM':
             try:
-                phi = control.get('GGM_1mphi')[ix]
-            except ValueError:
+                phi = control.get['GGM_1mphi'][ix]
+            except KeyError:
                     control['GGM_1mphi'] = [None] * len(control.get('NoiseModels'))
                     phi = None
-            except (IndexError, TypeError):
-                if isinstance( (phi := control.get('GGM_1mphi'))
-                              ,float):
-                    control['GGM_1mphi'] = [phi] * len(control.get('NoiseModels'))
-                else:
-                    raise ValueError(f'GGM 1-phi parameter list has wrong length, should be at least {ix}')
+            except TypeError:
+                control['GGM_1mphi'] = [phi] * len(control.get('NoiseModels'))
+            except IndexError:
+                raise ValueError(f'GGM 1-phi parameter list has wrong length, should be at least {ix}')
 
             if phi is None:
-                if control.unatended:
+                if control.get('unatended',False):
                     raise ValueError(f'Should specify 1-phi parameter for noise model {nm}')
 
                 # print(f'Please Specify 1-phi Parameter for model <{ix}:{nm}> : ', end='')
@@ -468,6 +470,7 @@ def parse_retro_ctl(fname):
             _check_missing_data,
             _check_trend_bias,
             _check_noise_models_is_list,
+            _chech_parameter_list_lengths,
             _check_lambda,
             _check_kappa,
             _check_sigma,
@@ -482,19 +485,17 @@ def parse_retro_ctl(fname):
              ]
 
     # Parsear el control File. No mas Control, es un diccionario común.
-    control = ctl_parser(fname)
+    control_ = ctl_parser(fname)
     # reemplazar defaults si necesita:
-    control = {**_control_defaults,**control}
+    control = {**_control_defaults}
+    control.update(**control_)
 
-    # Correr los chequeos, pedir entrada del usuario y alguna cosa mas
+    # Correr los chequeos, pedir entrada del usuario y algun,
     # que no quiero ni recordar, como garantizar que NoiseModels es una
     # Lista.
     # Varios de estos chequeos son recortes de partes del hector original
     for check in checks:
         check(control)
-
-    # tiramos la Clase molesta a la basura, queda el dict.
-    control = control.params
 
     # Empezamos a formatear el diccionario igual que si viniera del toml
     new_control = {'file_config': {k:v for k,v in control.items() \
@@ -538,31 +539,32 @@ def dict_to_ctl(control_data):
     # OJO: el nombre del modelo (por ejemplo "caca" en NoiseModels.GGM.caca)
     # Es ignorado alevosamente.
 
-    noise_models = [[k]*len(v) for k,v in control_data['NoiseModels'].items() ]
-    noise_models = [*chain(*noise_models)]
+    noise_models_labels = [[(k,k1) for k1 in v.keys()] for k,v in control_data['NoiseModels'].items() ]
+    noise_models_labels = [*chain(*noise_models_labels)]
+
+    noise_models = [m for m,l in noise_models_labels]
 
     lines.append("{:20}{}".format("NoiseModels",
                                   ' '.join(noise_models)))
 
     # El resto de los parámetros se pasan por línea de commandos.
-    _paramorder_new ={ 'White':('sigma'),
-                       'Powerlaw':('kappa','sigma'),
-                       'Flicker':('sigma'),
-                       'RandomWalk':('sigma'),
-                       'GGM':('one_minus_phi','kappa','sigma'),
-                       'VaryingAnnual':('phi','sigma'),
-                       'Matern':('lamba','kappa','sigma'),
-                       'AR1':('phi','sigma') }
+    _paramorder_new ={ 'White':['sigma'],
+                       'Powerlaw':['kappa','sigma'],
+                       'Flicker':['sigma'],
+                       'RandomWalk':['sigma'],
+                       'GGM':['one_minus_phi','kappa','sigma'],
+                       'VaryingAnnual':['phi','sigma'],
+                       'Matern':['lamba','kappa','sigma'],
+                       'AR1':['phi','sigma'] }
 
     cli_options = []
 
-    for model in noise_models:
-        params = control_data['NoiseModels'][model].values()
-        for p in params:
-            # Si usaramos los parámetros opcionales _fixed o GGM_1mphi del
-            # .ctl, deberíamos chequear aparte acá para no repetir. Un lío
-            # no tiene sentido.
-            cli_options.extend([p[i] for i in _paramorder_new[model]])
+    for model,label in noise_models_labels:
+        params = control_data['NoiseModels'][model][label]
+        # Si usaramos los parámetros opcionales _fixed o GGM_1mphi del
+        # .ctl, deberíamos chequear aparte acá para no repetir. Un lío
+        # no tiene sentido.
+        cli_options.extend([params[i] for i in _paramorder_new[model]])
 
     return lines, cli_options
 
@@ -652,10 +654,11 @@ if __name__ == '__main__':
         for arg in files:
             toml_to_ctl_cli(arg)
 
+        arg = Path(arg)
         print("Generated .ctl and .cli files.")
         print("Run hector using:")
-        print("simulatenoise -i {} < {}".format(fname.with_suffix('.ctl'),
-                                                fname.with_suffix('.cli')))
+        print("simulatenoise -i {} < {}".format(arg.with_suffix('.ctl'),
+                                                arg.with_suffix('.cli')))
 
     else:
         for arg in files:

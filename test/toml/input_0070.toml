@@ -1,0 +1,72 @@
+[file_config]
+TS_format = "mom"
+SimulationDir = "."
+SimulationLabel = "test_70"
+
+[general]
+NumberOfSimulations = 1
+SamplingPeriod = 10.932841677776587
+TimeNoiseStart = 0
+DeterministicNoise = true
+MissingData = false
+PercMissingData = 0.0
+Offsets = false
+Trend = 0
+NominalBias = 0
+AnnualSignal = 0
+NumberOfPoints = 621
+
+[NoiseModels.Matern.0]
+lamba = 0.021545377397235554
+kappa = -1.8636810240043953
+sigma = 9.46714806964139
+m = 621
+units = "mom"
+dt = 10.932841677776587
+
+[NoiseModels.AR1.1]
+sigma = 8.198176849781015
+phi = 0.8297340109810882
+m = 621
+units = "mom"
+dt = 10.932841677776587
+
+[NoiseModels.AR1.4]
+sigma = 9.41303246193984
+phi = 0.9155882028442746
+m = 621
+units = "mom"
+dt = 10.932841677776587
+
+[NoiseModels.Powerlaw.2]
+sigma = 5.103117287194862
+kappa = 1.1868505971642929
+m = 621
+units = "mom"
+dt = 10.932841677776587
+
+[NoiseModels.White.3]
+sigma = 4.277235951573065
+m = 621
+units = "mom"
+dt = 10.932841677776587
+
+[NoiseModels.GGM.5]
+one_minus_phi = 0.5603083238771528
+kappa = 1.1109344662681027
+sigma = 0.1204855729797516
+m = 621
+units = "mom"
+dt = 10.932841677776587
+
+[NoiseModels.Flicker.6]
+sigma = 0.028672321875720108
+m = 621
+units = "mom"
+dt = 10.932841677776587
+
+[NoiseModels.Flicker.7]
+sigma = 5.752506932500951
+m = 621
+units = "mom"
+dt = 10.932841677776587

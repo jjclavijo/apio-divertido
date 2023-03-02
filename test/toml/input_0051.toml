@@ -1,14 +1,12 @@
 [file_config]
 TS_format = "mom"
 SimulationDir = "."
-SimulationLabel = "test_"
+SimulationLabel = "test_51"
 
 [general]
 NumberOfSimulations = 1
-NumberOfPoints = 365
-SamplingPeriod = 1
+SamplingPeriod = 12.231263128884564
 TimeNoiseStart = 0
-#RepeatableNoise = true
 DeterministicNoise = true
 MissingData = false
 PercMissingData = 0.0
@@ -16,17 +14,11 @@ Offsets = false
 Trend = 0
 NominalBias = 0
 AnnualSignal = 0
+NumberOfPoints = 332
 
-[NoiseModels.Matern.1]
-m = 365
-sigma = 0.2
-lamba = 0.1
-kappa = -0.75
-
-[NoiseModels.GGM.1]
-m = 365
-sigma = 0.3
-kappa = 0.28
-one_minus_phi = 0.001
+[NoiseModels.VaryingAnnual.0]
+sigma = 0.3612685061742682
+phi = 0.24823330335707722
+m = 332
 units = "mom"
-dt = 1
+dt = 12.231263128884564
