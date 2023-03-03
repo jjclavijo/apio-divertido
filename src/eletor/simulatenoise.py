@@ -44,6 +44,7 @@ from eletor.helper import mactrick
 def simulate_noise(control):
 
     #--- Some variables that define the runs
+    ## Unpack all variables from the control object
     directory     = Path(control['file_config'].get("SimulationDir",''))
     label         = control['file_config'].get("SimulationLabel",'')
     n_simulations = control['general'].get("NumberOfSimulations",1)
@@ -53,13 +54,18 @@ def simulate_noise(control):
     noiseModels   = control['NoiseModels']
 
     repeatablenoise = control['general'].get('RepeatableNoise',False)
-
+    deterministic_noise = control['general'].get('DeterministicNoise',False)
+    time_format = control['file_config'].get('TS_format','mom')
 
     #--- Start the clock!
     start_time = time.time()
 
     #--- Create random number generator
     rng = np.random.default_rng(0) if repeatablenoise else None
+
+    ## For testing purposes
+    if deterministic_noise:
+        from eletor.not_rng import rng
 
     #--- Does the directory exists?
     if not os.path.exists(directory):
@@ -68,7 +74,7 @@ def simulate_noise(control):
     #--- Create time array. Default time format is mom
     # Dejo el if-else para que nos acordemos que esto tiene que
     # Cambiar.
-    if control['file_config'].get('TS_format','mom') == 'mom':
+    if time_format == 'mom':
         t0 = 51544.0
         t = np.linspace(t0,t0+m*dt,m,endpoint=False)
     else:
@@ -82,7 +88,7 @@ def simulate_noise(control):
     for k in range(0,n_simulations):
 
         #--- Open file to store time-series
-        datafile = label + '_' + str(k) + "." + control['file_config'].get('TS_format','mom')
+        datafile = label + '_' + str(k) + "." + time_format
         fname = str(directory.resolve()) + '/' + datafile
 
         #--- Create deterministic signal
