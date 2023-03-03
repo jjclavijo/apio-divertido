@@ -21,39 +21,11 @@ import os
 import sys
 from pathlib import Path
 import toml
+import pandas as pd
 
 #==============================================================================
 # Class definition
 #==============================================================================
-
-class SingletonMeta(type):
-    """
-    The Singleton class can be implemented in different ways in Python. Some
-    possible methods include: base class, decorator, metaclass. We will use the
-    metaclass because it is best suited for this purpose.
-    """
-
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        """
-        Possible changes to the value of the `__init__` argument do not affect
-        the returned instance.
-        """
-        if cls not in cls._instances:
-            instance = super().__call__(*args, **kwargs)
-            cls._instances[cls] = instance
-        return cls._instances[cls]
-
-
-
-    def clear(cls):
-        _ = cls._instances.pop(cls, None)
-
-
-
-    def clear_all(*args, **kwargs):
-        SingletonMeta._instances = {}
 
 class Control:
     """Class to store parameters that prescribe how the analysis should be done
@@ -670,6 +642,27 @@ def toml_to_ctl_cli(fname,dirname=None):
         f.writelines(map('{}\n'.format, cli))
 
     return 0
+
+def momwrite(y,ix,sampling_period,fname):
+    """Write the momdata to a file called fname
+
+    Args:
+        fname (string) : name of file that will be written
+    """
+    data = pd.DataFrame(y,ix)
+    with open(fname,'w') as fp:
+        print('--> {0:s}'.format(fname))
+
+        #--- Write header
+        fp.write('# sampling period {0:f}\n'.format(sampling_period))
+
+        #--- Write Body
+        print(data.dropna().reset_index()\
+                .to_string(index=False ,
+                 formatters=['{:12.6f}'.format,
+                             '{:13.6f}'.format] ,
+                 header=False),
+              file=fp)
 
 """
 Usage: python -m eletor.control [-I] <file1> <file2> ....

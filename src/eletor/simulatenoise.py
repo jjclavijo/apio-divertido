@@ -32,7 +32,8 @@ from pathlib import Path
 from scipy.special import kv
 
 #from eletor.control import Control, parse_retro_ctl
-from eletor.observations import Observations
+#from eletor.observations import Observations, momwrite
+from eletor.compat import momwrite
 
 from eletor import create_hs
 from eletor.helper import mactrick
@@ -40,8 +41,7 @@ from eletor.helper import mactrick
 # Subroutines
 #===============================================================================
 
-
-def simulate_noise(control,observations):
+def simulate_noise(control):
 
     #--- Some variables that define the runs
     directory     = Path(control['file_config'].get("SimulationDir",''))
@@ -53,6 +53,7 @@ def simulate_noise(control,observations):
     noiseModels   = control['NoiseModels']
 
     repeatablenoise = control['general'].get('RepeatableNoise',False)
+
 
     #--- Start the clock!
     start_time = time.time()
@@ -90,11 +91,7 @@ def simulate_noise(control,observations):
         #y += create_noise_(control,rng)
         y += create_noise(m,dt,ms,noiseModels,rng)
 
-        #--- convert this into Panda dataframe
-        observations.create_dataframe_and_F(t,y,[],dt)
-
-        #--- write results to file
-        observations.write(fname)
+        momwrite(y,t,dt,'salida.mom')
 
     #--- Show time lapsed
     print("--- {0:8.3f} seconds ---\n".format(float(time.time() - start_time)))
@@ -216,9 +213,7 @@ def main():
         print(f'Invalid file specification: {fname}')
         return 2 # Exit with errorcode 2: file not found
 
-    observations = Observations(control=control) #Singleton no more!
-
-    simulate_noise(control,observations)
+    simulate_noise(control)
 
 if __name__ == "__main__":
     exit(main())
