@@ -9,18 +9,18 @@ try:
 except ModuleNotFoundError:
     njit = lambda x: x
 
-def create_h_white(
-        *, 
+def create_h_White(
+        *,
         m,
         sigma,
         **kwags
     ):
     """
     Create impulse function for White noise.
-    
+
     $h = [\\sigma, 0, 0, ...]$
     """
-    
+
     #--- Array to fill impulse response
     h = np.zeros(m)
 
@@ -64,7 +64,7 @@ def recursion_GGM(
     return h
 
 def gauss_markov_scale_variance(
-        *, 
+        *,
         sigma,
         spectral_density,
         units,
@@ -91,8 +91,7 @@ def create_h_Powerlaw(
         *,
         m,
         kappa,
-        sigma, 
-        spectral_density,
+        sigma,
         units,
         dt,
         **kwargs
@@ -105,7 +104,6 @@ def create_h_Flicker(
         *,
         m,
         sigma,
-        spectral_density,
         units,
         dt,
         **kwargs
@@ -118,7 +116,6 @@ def create_h_RandomWalk(
         *,
         m,
         sigma,
-        spectral_density,
         units,
         dt,
         **kwargs):
