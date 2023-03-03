@@ -91,9 +91,6 @@ def simulate_noise(control):
         datafile = label + '_' + str(k) + "." + time_format
         fname = str(directory.resolve()) + '/' + datafile
 
-        #--- Create deterministic signal
-        y = create_trend(control,t)
-
         #--- Create the synthetic noise
         #y += create_noise_(control,rng)
         y += create_noise(m,dt,ms,noiseModels,rng)
@@ -154,30 +151,6 @@ def create_noise(
         # print(s, ha)
         w = s * rng.standard_normal(m+ms)
         y += signal.fftconvolve(ha, w)[0:m]
-
-    return y
-
-def create_trend(control,times,
-                 dsignal_dt=365.25):
-    """
-    dsignal_dt: if signal units are not dt units.
-                by default dt is in units of days and
-                trends are expressed in units of years
-                also periodic signals are expressed in
-                units of years
-    """
-    bias = control['general'].get('NominalBias',0)
-    trend = control['general'].get('Trend',0)
-    annualAmplitude = control['general'].get('AnnualSignal',0)
-
-    if not isinstance(times,np.ndarray):
-        times = np.array(times)
-
-    y = bias + trend * (times - times[0])/dsignal_dt
-
-    if abs(annualAmplitude) > 0:
-        y += annualAmplitude * np.cos(2*np.pi*(times - times[0])/dsignal_dt)
-        # TODO: why does the annual signal have to start alongside the noise?
 
     return y
 
