@@ -20,149 +20,61 @@
 import os
 import sys
 from pathlib import Path
+from ast import literal_eval
+from math import isnan
 import toml
 
 #==============================================================================
 # Class definition
 #==============================================================================
 
-class SingletonMeta(type):
-    """
-    The Singleton class can be implemented in different ways in Python. Some
-    possible methods include: base class, decorator, metaclass. We will use the
-    metaclass because it is best suited for this purpose.
-    """
-
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        """
-        Possible changes to the value of the `__init__` argument do not affect
-        the returned instance.
-        """
-        if cls not in cls._instances:
-            instance = super().__call__(*args, **kwargs)
-            cls._instances[cls] = instance
-        return cls._instances[cls]
-
-
-
-    def clear(cls):
-        _ = cls._instances.pop(cls, None)
-
-
-
-    def clear_all(*args, **kwargs):
-        SingletonMeta._instances = {}
-
-class Control:
-    """Class to store parameters that prescribe how the analysis should be done
-    """
-    def __init__(self, ctl_file,
-                 defaults={},unatended=False):
-        """This is my Control class
-
-        Args:
-            ctl_file (string) : name of text-file with parameters
-        Oprional Args:
-            defaults : dictionary of labels:defaultValue
-                       for mandatory arguments.
-                       Defaults for mandatory arguments will not be used unless
-                       explicitly asked by de user or by passing the unatended
-                       flag, in which case a warning will be logged.
-        """
-
-        if not os.path.exists(ctl_file):
-            raise FileNotFoundError(2,"No such file or directory",ctl_file)
-
-        self.params = {}
-        self.defaults = defaults
-        self.unatended = unatended
-
-        with open(ctl_file,'r') as fp:
-            for line in fp:
-                cols = line.split()
-                if len(cols) == 0: # Skip empty lines
-                        continue
-
-                label = cols[0]
-                if len(cols) == 1:
-                    if label in self.defaults:
-                        raise ValueError(f'Control File: found label {label:s} but no value, is probably a mandatory option left blank for you to fill!')
-                    else:
-                        raise ValueError(f'Control File: found label {label:s} but no value!')
-
-                if cols[1]=='Yes' or cols[1]=='yes':
-                    self.params[label] = True
-                elif cols[1]=='No' or cols[1]=='no':
-                    self.params[label] = False
-                elif cols[1].isdigit()==True:
-                    self.params[label] = int(cols[1])
-                else:
-                    if self.is_float(cols[1])==True:
-                        if len(cols)==2:
-                            self.params[label] = float(cols[1])
-                        else:
-                            self.params[label] = []
-                            for i in range(1,len(cols)):
-                               self.params[label].append(float(cols[i]))
-                    else:
-                        if len(cols)==2:
-                            self.params[label] = cols[1]
-                        elif len(cols)>2:
-                            self.params[label] = cols[1:]
-                        else:
-                            assert False # shouldn't come here
-                            # print('found label {0:s} but no value!'.\
-                            # format(label))
-                            # sys.exit()
-
-    def is_float(self,x):
-        """ Check if string is float
-
-        Args:
-           x (string) : is this a float string?
-
-        Returns:
-           True is number is float
-        """
+def cast(string):
+    try:
+        casted = literal_eval(string)
+    except ValueError:
+        # era string o Yes/No
         try:
-            float(x)
-            return True
-        except ValueError:
-            return False
+            return {'yes':True,'no':False}[string.lower()]
+        except KeyError:
+            # era string
+            return string
 
-    def get(self,parameter):
-        if parameter in self.params:
-            return self.params[parameter]
+def ctl_parser(ctl_file):
+    """This is my Control class
 
-        elif parameter in self.defaults:
-            p = self.defaults[parameter]
-            if p is None:
-                raise ValueError(f"Parameter {parameter} is mandatory and has no default value")
+    Args:
+        ctl_file (string) : name of text-file with parameters
+    """
+    # Read file
+    with open(ctl_file,'r') as f:
+        data = f.readlines()
 
-            elif self.unatended or \
-                 (input(f'Parameter {parameter} is mandatory, use default value of <{p}>? [y/N]: ')\
-                  in ('y','Y')):
-                return p
+    # Split Lines
+    data = [*map(str.split,data)]
 
-            raise ValueError(f"Parameter f{parameter} is mandatory")
+    # Cast string a Int, Float, bool o dejarlo como estaba
+    # el map es porque es para cada elemento de cada línea
+    data = [[*map(cast,x)] for x in data]
 
-        raise ValueError("Trying to get undefined parameter f{parameter}")
+    # de cada línea el primer elemento es la etiqueta y el resto es parámetro
+    # El if es para pasar elementos simples en lugar de listas de 1.
+    # Es regla poner un oneliner en cada función para conservar mi identidad.
+    data = {line.pop(0):(line[0] if len(line) == 1 else line) for line in data}
 
-    def __getitem__(self,key):
-        return self.get(key)
-
-    def __setitem__(self,key,newvalue):
-        self.params[key] = newvalue
+    return data
 
 #===============================================================================
 # Control parameter verification functions.
 #===============================================================================
 """
-These are functions meant to be run just after initialization of the
-Control instance.
-Each function checks and ask for correction of errors in the parameter structure
+Todos estos chequeos que vienen acá son para garantizar que las opciones que
+no entran por el .ctl se pasen por línea de comandos en el momento que se
+intenta transformar un .ctl a .toml.
+
+De paso se chequea que estén en los rangos adecuados.
+
+NO VOY A DOCUMENTAR ESTO, ES FEO, ESTÁ COPIADO Y PEGADO DE CUALQUIER MANERA,
+PERO ANDA. Y ES MUY POCO PROBABLE QUE LO NECESITEMOS.
 """
 
 class mustAsk(object):
@@ -171,7 +83,7 @@ class mustAsk(object):
     def __str__(self):
         return 'MustAsk'
 
-MustAsk = mustAsk() # A marker for need to ask for parameter.
+MustAsk = mustAsk() # A marker for "need to ask" for parameter.
 
 # The order of parameter reading form commandline in the original version is:
 # TODO: Keep this order for compatibility.
@@ -410,8 +322,109 @@ def _check_noise_models_is_list(control):
 # ================================================================
 #
 
+# Todas estas variables tienen que ver con saber qué parametros tengo que
+# leer para cada modelo y saber los defaults que tengo que devolver.
 
-control_defaults = {
+
+# model specific parameters
+
+_paramlist = {'White':('NumberOfPoints','Sigma'),
+              'Powerlaw':('NumberOfPoints','Sigma','Kappa','TS_format','SamplingPeriod'),
+              'Flicker':('NumberOfPoints','Sigma','TS_format','SamplingPeriod'),
+              'RandomWalk':('NumberOfPoints','Sigma','TS_format','SamplingPeriod'),
+              'GGM':('NumberOfPoints','Sigma','Kappa','GGM_1mphi','TS_format','SamplingPeriod'),
+              'VaryingAnnual':('NumberOfPoints','Sigma','Phi','TS_format','SamplingPeriod'),
+              'Matern':('NumberOfPoints','Sigma','Lambda','Kappa'),
+              'AR1':('NumberOfPoints','Sigma','Phi')}
+
+# TODO: nuevos nombres para las variables, preferentemente con prefijo
+_param_conversion = {'NumberOfPoints':'m',
+                     'TS_format':'units',
+                     'SamplingPeriod':'dt',
+                     'GGM_1mphi':'one_minus_phi',
+                     'Lambda':'lamba'}
+
+_param_conversion_r = {v:k for k,v in _param_conversion.items()}
+
+def get_nm_parameter(ix,model,control,parameter):
+    """
+    Cada modelo tiene sus propios parámetros requeridos.
+
+    En el archivo viejo los parámetros se pasan en listas.
+    Por eso entra el index al que corresponde el modelo a analizar
+    y el diccionario de control.
+
+    Además, hay modelos en los que hay dos formas de indicar algunos
+    parámetros (por línea de comandos o por una variable en control.
+    por eso existe esta función.
+    """
+    if parameter == 'NumberOfPoints':
+        return control['NumberOfPoints']
+    if parameter == 'Sigma':
+        return control['Sigma'][ix]
+    if parameter == 'Kappa':
+        if model == 'Matern':
+            try:
+                return control['kappa_fixed']
+            except KeyError:
+                pass
+        return control['Kappa'][ix]
+    if parameter == 'TS_format':
+        return control['TS_format']
+    if parameter == 'SamplingPeriod':
+        return control['SamplingPeriod']
+    if parameter == 'GGM_1mphi':
+        if isinstance((ggm := control['GGM_1mphi']),list):
+            return ggm[ix]
+        else:
+            return ggm
+    if parameter == 'Phi':
+        if model == 'VaryingAnnual':
+            try:
+                return control['phi_fixed']
+            except KeyError:
+                pass
+        return control['Phi'][ix]
+    if parameter == 'Lambda':
+        if model == 'Matern':
+            try:
+                return control['lambda_fixed']
+            except KeyError:
+                pass
+        return control['Lambda'][ix]
+
+    raise KeyError(f'Incorrect parameter {parameter} for required model {model}')
+
+def get_noisemodels(control):
+    """
+    esta funcion es un helper para leer los parámetros de cada modelo que esté
+    en el .ctl, entra el diccionario en formato viejo y sale una lista de
+    tipo_de_modelo, parametro
+    """
+    models = control["NoiseModels"]
+    if not isinstance(models,list):
+        models = [models]
+
+    rmodels = []
+
+    for ix,model in enumerate(models):
+        params = {}
+        # iterate over model_specific parameters
+        for p in _paramlist[model]:
+            # some parameters are renamed
+            if p in _param_conversion:
+                k = _param_conversion[p]
+            # other are only lowered
+            else:
+                k = p.lower()
+            # get and store each parameter
+            params[k] = get_nm_parameter(ix,model,control,p)
+        rmodels.append( (model,
+                         params) )
+
+    return rmodels
+
+_control_defaults = {
         'SimulationDir':None,
         'SimulationLabel':None,
         'TS_format':'mom',
@@ -441,96 +454,16 @@ _general_params = [
         'NominalBias',
         'AnnualSignal']
 
-
 _file_config_params = [
         'SimulationDir',
         'SimulationLabel',
         'TS_format']
 
-
-# model specific parameters
-
-_paramlist = {'White':('NumberOfPoints','Sigma'),
-              'Powerlaw':('NumberOfPoints','Sigma','Kappa','TS_format','SamplingPeriod'),
-              'Flicker':('NumberOfPoints','Sigma','TS_format','SamplingPeriod'),
-              'RandomWalk':('NumberOfPoints','Sigma','TS_format','SamplingPeriod'),
-              'GGM':('NumberOfPoints','Sigma','Kappa','GGM_1mphi','TS_format','SamplingPeriod'),
-              'VaryingAnnual':('NumberOfPoints','Sigma','Phi','TS_format','SamplingPeriod'),
-              'Matern':('NumberOfPoints','Sigma','Lambda','Kappa'),
-              'AR1':('NumberOfPoints','Sigma','Phi')}
-
-# TODO: nuevos nombres para las variables, preferentemente con prefijo
-_param_conversion = {'NumberOfPoints':'m',
-                     'TS_format':'units',
-                     'SamplingPeriod':'dt',
-                     'GGM_1mphi':'one_minus_phi',
-                     'Lambda':'lamba'}
-
-_param_conversion_r = {v:k for k,v in _param_conversion.items()}
-
-def get_nm_parameter(ix,model,control,parameter):
-    if parameter == 'NumberOfPoints':
-        return control['NumberOfPoints']
-    if parameter == 'Sigma':
-        return control['Sigma'][ix]
-    if parameter == 'Kappa':
-        if model == 'Matern':
-            try:
-                return control['kappa_fixed']
-            except (ValueError,KeyError):
-                pass
-        return control['Kappa'][ix]
-    if parameter == 'TS_format':
-        return control['TS_format']
-    if parameter == 'SamplingPeriod':
-        return control['SamplingPeriod']
-    if parameter == 'GGM_1mphi':
-        if isinstance((ggm := control['GGM_1mphi']),list):
-            return ggm[ix]
-        else:
-            return ggm
-    if parameter == 'Phi':
-        if model == 'VaryingAnnual':
-            try:
-                return control['phi_fixed']
-            except (ValueError,KeyError):
-                pass
-        return control['Phi'][ix]
-    if parameter == 'Lambda':
-        if model == 'Matern':
-            try:
-                return control['lambda_fixed']
-            except (ValueError,KeyError):
-                pass
-        return control['Lambda'][ix]
-
-    raise KeyError(f'Incorrect parameter {parameter} for required model {model}')
-
-def get_noisemodels(control):
-    models = control["NoiseModels"]
-    if not isinstance(models,list):
-        models = [models]
-
-    rmodels = []
-
-    for ix,model in enumerate(models):
-        params = {}
-        # iterate over model_specific parameters
-        for p in _paramlist[model]:
-            # some parameters are renamed
-            if p in _param_conversion:
-                k = _param_conversion[p]
-            # other are only lowered
-            else:
-                k = p.lower()
-            # get and store each parameter
-            params[k] = get_nm_parameter(ix,model,control,p)
-        rmodels.append( (model,
-                         params) )
-
-    return rmodels
-
 def parse_retro_ctl(fname):
+    """
+    Parsear un viejo archivo ctl para convertirlo a un nuevo toml
+    Devuelve un diccionario en el nuevo formato.
+    """
     checks = [
             _check_missing_data,
             _check_trend_bias,
@@ -548,10 +481,15 @@ def parse_retro_ctl(fname):
             _check_phi # repeat boundary checks.
              ]
 
-    # Parsear el control File
-    control = Control(fname,control_defaults)
+    # Parsear el control File. No mas Control, es un diccionario común.
+    control = ctl_parser(fname)
+    # reemplazar defaults si necesita:
+    control = {**_control_defaults,**control}
 
-    # Correr los chequeos y pedir entrada del usuario
+    # Correr los chequeos, pedir entrada del usuario y alguna cosa mas
+    # que no quiero ni recordar, como garantizar que NoiseModels es una
+    # Lista.
+    # Varios de estos chequeos son recortes de partes del hector original
     for check in checks:
         check(control)
 
@@ -582,52 +520,29 @@ from itertools import chain
 
 def dict_to_ctl(control_data):
     """
-    convert new formatted dir to ctl formatted string
+    Convierte un diccionario cargado desde un toml de configuración al formato
+    que usa hector:
+
+    Devuelve:
+        List[str] : para escribir al archivo .ctl
+        List[float] : parámetros para pasar de a uno por .cli
     """
+
+    # Todo lo que es file_config y general para de una
     lines = [f"{k:20}{v}" for k,v in control_data['file_config'].items() ]
     lines.extend([f"{k:20}{v}" for k,v in control_data['general'].items() ])
 
     # Obvio que hay formas menos villeras de hacer esto, pero la idea es
     # que cada tipo de modelo puede estar más de una vez. Y no tengo tiempo de
     # pensar ahora.
+    # OJO: el nombre del modelo (por ejemplo "caca" en NoiseModels.GGM.caca)
+    # Es ignorado alevosamente.
+
     noise_models = [[k]*len(v) for k,v in control_data['NoiseModels'].items() ]
     noise_models = [*chain(*noise_models)]
 
     lines.append("{:20}{}".format("NoiseModels",
                                   ' '.join(noise_models)))
-
-    """
-    # Hay tres parámetros de los modelos de ruido que pueden pasarse
-    # por el archivo .ctl si son iguales para todos los modelos de su tipo.
-    # Pordíamos setearlos con algo así:
-
-    if 'GGM' in control_data['NoiseModels']:
-        one_minus_phi_params = [i['one_minus_phi'] for i in \
-                                control_data['NoiseModels']['GGM'].values()]
-        if len(set(one_minus_phi_params)) == 1:
-            lines.append("{:20}{}".format("GGM_1mphi",one_minus_phi_params[0]))
-
-    if 'Matern' in control_data['NoiseModels']:
-        lambda_params = [i['lamba'] for i in \
-                                control_data['NoiseModels']['Matern'].values()]
-        if len(set(lambda_params)) == 1:
-            lines.append("{:20}{}".format("lambda_fixed",lambda_params[0]))
-
-        kappa_params = [i['kappa'] for i in \
-                                control_data['NoiseModels']['Matern'].values()]
-        if len(set(kappa_params)) == 1:
-            lines.append("{:20}{}".format("kappa_fixed",kappa_params[0]))
-
-    if 'VaryingAnnual' in control_data['NoiseModels']:
-        phi_params = [i['phi'] for i in \
-                                control_data['NoiseModels']['VaryingAnnual'].values()]
-        if len(set(phi_params)) == 1:
-            lines.append("{:20}{}".format("phi_fixed",phi_params[0]))
-
-    # Sin embargo, la idea es que en el toml los parámetros estén especificados
-    # independientemente para cada modelo, asique los vamos a tratar como
-    # parámetros para línea de comandos.
-    """
 
     # El resto de los parámetros se pasan por línea de commandos.
     _paramorder_new ={ 'White':('sigma'),
@@ -646,30 +561,76 @@ def dict_to_ctl(control_data):
         for p in params:
             # Si usaramos los parámetros opcionales _fixed o GGM_1mphi del
             # .ctl, deberíamos chequear aparte acá para no repetir. Un lío
+            # no tiene sentido.
             cli_options.extend([p[i] for i in _paramorder_new[model]])
 
     return lines, cli_options
 
 def toml_to_ctl_cli(fname,dirname=None):
-    fname = Path(fname)
-    with fname.with_suffix('.toml').open('r') as f:
-        control_data = toml.load(f)
-    lines, cli = dict_to_ctl(control_data)
+    """
+    Convertir el archivo toml a un archivo .ctl (input de hector) y uno .cli
+    (para pasarle a hector por línea de comandos)
 
+    Args:
+
+    fname : nombre de archivo
+    dirname : opcional directorio de salida
+    """
+
+    # Usar un Path para poder cambiár el sufijo más facil.
+    fname = Path(fname)
+
+    # Cargar los datos del toml
+    with fname.open('r') as f:
+        control_data = toml.load(f)
+
+    # Convertir el toml separando los parámetros del archivo de control
+    # y de la linea de comandos
+    control_lines, cli = dict_to_ctl(control_data)
+
+    # Agregar directorio al path si lo hay (y es válido)
     if not dirname is None:
         directory = Path(dirname)
         if not directory.is_dir():
             raise ValueError("bad directory")
         fname = directory/fname.name
 
-    print(fname)
+    # Escribir el ctl
     with fname.with_suffix('.ctl').open('w') as f:
-        f.writelines(map(lambda x: x+'\n', lines))
+        # Este oneliner te lo dejo para molestarte.
+        f.writelines(map(lambda x: x+'\n', control_lines))
 
+    # Escribir el cli
     with fname.with_suffix('.cli').open('w') as f:
         f.writelines(map('{}\n'.format, cli))
 
     return 0
+
+def momwrite(y,ix,sampling_period,fname):
+    """
+    Escribir los datos <y> con el índice <ix> en un archivo de nombre <fname>
+    con el formato de archivo que usa hector (.mom).
+
+    Hay que pasarle el sampling_period porque hector lo escribe en el
+    encabezado.
+    """
+
+    # generar las líneas sin formatear, eliminando las que sean nan.
+    data = [(i,d) for i,d in zip(ix,y) if not isnan(d)]
+
+    formatter='{:12.6f} {:13.6f}\n'.format
+
+    # formatear líneas.
+    datalines = [formatter(*d) for d in data]
+
+    with open(fname,'w') as fp:
+        print('--> {0:s}'.format(fname))
+
+        #--- Write header
+        fp.write('# sampling period {0:f}\n'.format(sampling_period))
+
+        #--- Formatear los datos igual que hector
+        fp.writelines(datalines)
 
 """
 Usage: python -m eletor.control [-I] <file1> <file2> ....

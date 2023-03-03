@@ -32,7 +32,8 @@ from pathlib import Path
 from scipy.special import kv
 
 #from eletor.control import Control, parse_retro_ctl
-from eletor.observations import Observations
+#from eletor.observations import Observations, momwrite
+from eletor.compat import momwrite
 
 from eletor import create_hs
 from eletor.helper import mactrick
@@ -40,8 +41,7 @@ from eletor.helper import mactrick
 # Subroutines
 #===============================================================================
 
-
-def simulate_noise(control,observations):
+def simulate_noise(control):
 
     #--- Some variables that define the runs
     directory     = Path(control['file_config'].get("SimulationDir",''))
@@ -50,8 +50,10 @@ def simulate_noise(control,observations):
     m             = control['general'].get("NumberOfPoints")
     dt            = control['general'].get("SamplingPeriod")
     ms            = control['general'].get("TimeNoiseStart",0)
+    noiseModels   = control['NoiseModels']
 
     repeatablenoise = control['general'].get('RepeatableNoise',False)
+
 
     #--- Start the clock!
     start_time = time.time()
@@ -64,12 +66,13 @@ def simulate_noise(control,observations):
        os.makedirs(directory)
 
     #--- Create time array. Default time format is mom
+    # Dejo el if-else para que nos acordemos que esto tiene que
+    # Cambiar.
     if control['file_config'].get('TS_format','mom') == 'mom':
         t0 = 51544.0
         t = np.linspace(t0,t0+m*dt,m,endpoint=False)
-
-    elif control['file_config']['TS_format'] == 'msf':
-        t = np.linspace(0,m*dt,m,endpoint=False)
+    else:
+        raise NotImplementedError
 
     # En algún momento a alguien le pareció útil pensar que el índice de
     # tiempos había que tener la posibilidad de leerlo de un archivo de datos.
@@ -86,13 +89,11 @@ def simulate_noise(control,observations):
         y = create_trend(control,t)
 
         #--- Create the synthetic noise
-        y += create_noise_(control,rng)
+        #y += create_noise_(control,rng)
+        y += create_noise(m,dt,ms,noiseModels,rng)
 
-        #--- convert this into Panda dataframe
-        observations.create_dataframe_and_F(t,y,[],dt)
-
-        #--- write results to file
-        observations.write(fname)
+        #--- TODO: not always write mom files
+        momwrite(y,t,dt,fname)
 
     #--- Show time lapsed
     print("--- {0:8.3f} seconds ---\n".format(float(time.time() - start_time)))
@@ -112,36 +113,16 @@ _paramlist = {'White':('NumberOfPoints','Sigma'),
               'Matern':('NumberOfPoints','Sigma','Lambda','Kappa'),
               'AR1':('NumberOfPoints','Sigma','Phi')}
 
-def create_noise_(
-        control,
+def create_noise(
+        m,
+        dt,
+        ms,
+        noiseModels,
         rng=None
     ):
-    """ Configure and create noise from the config file
-    Args:
-        control: dict
-            Dictionary with the control parameters, content raw
-        rng: np.random.Generator or None
-            ??
-    Returns:
-        noise: np.ndarray
-            Array with the noise
-    TODO: Nombre de las variables podrian ser mas decriptivos
-    TODO: los aprametros generales como n_simulations, m, dt, ms, deberian ser pasados como argumentos
-    TODO: los modelos y sus configuraciones deberian ser pasados como un diccionario/argumento aparte
-    """
-
-    n_simulations = control['general'].get("NumberOfSimulations",1)
-    m             = control['general']["NumberOfPoints"]
-    dt            = control['general']["SamplingPeriod"]
-    ms            = control['general'].get("TimeNoiseStart",0)
-
-    noiseModels   = control['NoiseModels']
-    return create_noise(m,dt,ms,noiseModels,rng)
-
-def create_noise(m,dt,ms,noiseModels,rng=None):
     """ Toma la lista de los modelos que quiere usar junto con los parametros y isntancia los nuevos modelos desde create_H
     """
-
+    print("Params de create_noise: ", m, dt, ms, noiseModels, rng)
     sigma = []
     h = []
     for model, params in noiseModels.items():
@@ -151,11 +132,8 @@ def create_noise(m,dt,ms,noiseModels,rng=None):
 
         for i in params.keys():
             ## Cada modelo puede estar mas de una vez
-
             print(f"--> About to run model {model} with params {params[i]}")
-
             single_s, single_h = model_function(**params[i])
-
             sigma.append(single_s)
             h.append(single_h)
 
@@ -237,9 +215,7 @@ def main():
         print(f'Invalid file specification: {fname}')
         return 2 # Exit with errorcode 2: file not found
 
-    observations = Observations(control=control['file_config']) #Singleton no more!
-
-    simulate_noise(control,observations)
+    simulate_noise(control)
 
 if __name__ == "__main__":
     exit(main())
