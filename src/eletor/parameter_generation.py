@@ -3,7 +3,7 @@ import click
 import numpy as np
 import toml
 
-def random_white_parameters(model_label,sigma=None,m=None,dt=None):
+def white(model_label,sigma=None,m=None,dt=None):
     """
     Devuelve un diccionario adecuado para incluir adentro del diccionario
     "NoiseModels" en el toml. Cuidado si hay mas de un modelo del mismo tipo,
@@ -24,7 +24,7 @@ def random_white_parameters(model_label,sigma=None,m=None,dt=None):
 
     return {"NoiseModels":{"White":{model_label:params}}}
 
-def random_powerlaw_parameters(model_label,sigma=None,kappa=None,m=None,dt=None):
+def powerlaw(model_label,sigma=None,kappa=None,m=None,dt=None):
     """
     Devuelve un diccionario adecuado para incluir adentro del diccionario
     "NoiseModels" en el toml. Cuidado si hay mas de un modelo del mismo tipo,
@@ -48,7 +48,7 @@ def random_powerlaw_parameters(model_label,sigma=None,kappa=None,m=None,dt=None)
 
     return {"NoiseModels":{"Powerlaw":{model_label:params}}}
 
-def random_flicker_parameters(model_label,sigma=None,m=None,dt=None):
+def flicker(model_label,sigma=None,m=None,dt=None):
     """
     Devuelve un diccionario adecuado para incluir adentro del diccionario
     "NoiseModels" en el toml. Cuidado si hay mas de un modelo del mismo tipo,
@@ -70,7 +70,7 @@ def random_flicker_parameters(model_label,sigma=None,m=None,dt=None):
 
     return {'NoiseModels':{"Flicker":{model_label:params}}}
 
-def random_randomwalk_parameters(model_label,sigma=None,m=None,dt=None):
+def randomwalk(model_label,sigma=None,m=None,dt=None):
     """
     Devuelve un diccionario adecuado para incluir adentro del diccionario
     "NoiseModels" en el toml. Cuidado si hay mas de un modelo del mismo tipo,
@@ -91,7 +91,7 @@ def random_randomwalk_parameters(model_label,sigma=None,m=None,dt=None):
 
     return {"NoiseModels":{"RandomWalk":{model_label:params}}}
 
-def random_ggm_parameters(model_label,sigma=None,one_minus_phi=None,kappa=None,m=None,dt=None):
+def ggm(model_label,sigma=None,one_minus_phi=None,kappa=None,m=None,dt=None):
     """
     Devuelve un diccionario adecuado para incluir adentro del diccionario
     "NoiseModels" en el toml. Cuidado si hay mas de un modelo del mismo tipo,
@@ -119,7 +119,7 @@ def random_ggm_parameters(model_label,sigma=None,one_minus_phi=None,kappa=None,m
     return {"NoiseModels":{"GGM":{model_label:params}}}
 
 
-def random_varyingannual_parameters(model_label,sigma=None,phi=None,m=None,dt=None):
+def varyingannual(model_label,sigma=None,phi=None,m=None,dt=None):
     """
     Devuelve un diccionario adecuado para incluir adentro del diccionario
     "NoiseModels" en el toml. Cuidado si hay mas de un modelo del mismo tipo,
@@ -144,7 +144,7 @@ def random_varyingannual_parameters(model_label,sigma=None,phi=None,m=None,dt=No
     return {"NoiseModels":{"VaryingAnnual":{model_label:params}}}
 
 
-def random_matern_parameters(model_label,sigma=None,lamba=None,kappa=None,m=None,dt=None):
+def matern(model_label,sigma=None,lamba=None,kappa=None,m=None,dt=None):
     """
     Devuelve un diccionario adecuado para incluir adentro del diccionario
     "NoiseModels" en el toml. Cuidado si hay mas de un modelo del mismo tipo,
@@ -172,7 +172,7 @@ def random_matern_parameters(model_label,sigma=None,lamba=None,kappa=None,m=None
     return {"NoiseModels":{"Matern":{model_label:params}}}
 
 
-def random_ar1_parameters(model_label,sigma=None,phi=None,m=None,dt=None):
+def ar1(model_label,sigma=None,phi=None,m=None,dt=None):
     """
     Devuelve un diccionario adecuado para incluir adentro del diccionario
     "NoiseModels" en el toml. Cuidado si hay mas de un modelo del mismo tipo,
