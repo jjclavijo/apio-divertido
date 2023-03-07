@@ -149,7 +149,7 @@ def test_calls_proper_h(model):
     control_data = toml.loads(toml_string)
 
     h_mock = mock.Mock(return_value=(1,np.ones(100)))
-    with mock.patch(f'eletor.simulatenoise.create_hs.create_h_{model}',h_mock):
+    with mock.patch(f'eletor.simulatenoise.create_hs.{model}',h_mock):
         y = hps.create_noise(
                 100, # number of points
                 1, # sampling period
@@ -172,7 +172,7 @@ def test_identity1_convolution(model):
     would have created.
     """
     parameter_fun = getattr(eletor.parameter_generation,
-                    f"random_{model.lower()}_parameters")
+                    model.lower())
     parameters = parameter_fun('1',m=100,dt=1)
 
     mock_fftconvolve = mock.Mock(side_effect=lambda x,y:x)
@@ -185,7 +185,7 @@ def test_identity1_convolution(model):
                 parameters['NoiseModels'],
                 rng=None)
 
-    window_fun = getattr(eletor.create_hs,f'create_h_{model}')
+    window_fun = getattr(eletor.create_hs,model)
 
     _,window = window_fun(**parameters['NoiseModels'][model]['1'])
 
@@ -201,7 +201,7 @@ def test_identity2_convolution_is_the_noise(model):
     version.
     """
     parameter_fun = getattr(eletor.parameter_generation,
-                    f"random_{model.lower()}_parameters")
+                    model.lower())
     parameters = parameter_fun('1',m=100,dt=1)
 
     mock_fftconvolve = mock.Mock(side_effect=lambda x,y:y)
@@ -248,6 +248,7 @@ def test_samples_not_normal(model):
     Test that, if we mock scipy.signal.fftconvolve with the identity
     create_noise function just returns whit noise
     """
+
     pvalues = []
 
     # Deterministico, pero partimos de un ruido
@@ -267,7 +268,7 @@ def test_samples_not_normal(model):
     pvalue = pvalue0
     for i in range(2):
         parameter_fun = getattr(eletor.parameter_generation,
-                        f"random_{model.lower()}_parameters")
+                        model.lower())
         parameters = parameter_fun('1',sigma=1,m=100,dt=5)
 
         y = hps.create_noise(
