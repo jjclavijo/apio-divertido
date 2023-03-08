@@ -9,7 +9,7 @@ try:
 except ModuleNotFoundError:
     njit = lambda x: x
 
-def create_h_White(
+def White(
         *,
         m,
         sigma,
@@ -87,7 +87,7 @@ def gauss_markov_scale_variance(
 
     return sigma
 
-def create_h_Powerlaw(
+def Powerlaw(
         *,
         m,
         kappa,
@@ -100,7 +100,7 @@ def create_h_Powerlaw(
     gmsv = gauss_markov_scale_variance(sigma=sigma,spectral_density=d,units=units,dt=dt)
     return gmsv, recursion_Power_Flicker_RW(m,d)
 
-def create_h_Flicker(
+def Flicker(
         *,
         m,
         sigma,
@@ -112,7 +112,7 @@ def create_h_Flicker(
     gmsv = gauss_markov_scale_variance(sigma=sigma,spectral_density=d,units=units,dt=dt)
     return gmsv, recursion_Power_Flicker_RW(m,d)
 
-def create_h_RandomWalk(
+def RandomWalk(
         *,
         m,
         sigma,
@@ -123,9 +123,9 @@ def create_h_RandomWalk(
     gmsv = gauss_markov_scale_variance(sigma=sigma,spectral_density=d,units=units,dt=dt)
     return gmsv, recursion_Power_Flicker_RW(m,d)
 
-#def create_h_GGM(m,kappa,one_minus_phi,**kwargs):
+#def GGM(m,kappa,one_minus_phi,**kwargs):
 ## El asterisco es para que los parametros que se le pasan a la funcion sean nombrados
-def create_h_GGM(
+def GGM(
         *,
         m,
         kappa,
@@ -152,7 +152,7 @@ def recursion_VaryingAnnual(m,phi,dt):
 
     return t
 
-def create_h_VaryingAnnual(
+def VaryingAnnual(
         *,
         m,
         phi,
@@ -170,7 +170,7 @@ def create_h_VaryingAnnual(
     return sigma, h
 
 
-def create_h_Matern(
+def Matern(
         *,
         m,
         lamba,
@@ -220,7 +220,7 @@ def recursion_AR1(m,phi):
 
     return t
 
-def create_h_AR1(
+def AR1(
         *,
         m,
         phi,

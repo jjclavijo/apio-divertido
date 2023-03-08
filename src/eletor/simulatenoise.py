@@ -44,6 +44,7 @@ from eletor.helper import mactrick
 def simulate_noise(control):
 
     #--- Some variables that define the runs
+    ## Unpack all variables from the control object
     directory     = Path(control['file_config'].get("SimulationDir",''))
     label         = control['file_config'].get("SimulationLabel",'')
     n_simulations = control['general'].get("NumberOfSimulations",1)
@@ -53,13 +54,18 @@ def simulate_noise(control):
     noiseModels   = control['NoiseModels']
 
     repeatablenoise = control['general'].get('RepeatableNoise',False)
-
+    deterministic_noise = control['general'].get('DeterministicNoise',False)
+    time_format = control['file_config'].get('TS_format','mom')
 
     #--- Start the clock!
     start_time = time.time()
 
     #--- Create random number generator
     rng = np.random.default_rng(0) if repeatablenoise else None
+
+    ## For testing purposes
+    if deterministic_noise:
+        from eletor.not_rng import rng
 
     #--- Does the directory exists?
     if not os.path.exists(directory):
@@ -68,7 +74,7 @@ def simulate_noise(control):
     #--- Create time array. Default time format is mom
     # Dejo el if-else para que nos acordemos que esto tiene que
     # Cambiar.
-    if control['file_config'].get('TS_format','mom') == 'mom':
+    if time_format == 'mom':
         t0 = 51544.0
         t = np.linspace(t0,t0+m*dt,m,endpoint=False)
     else:
@@ -82,11 +88,8 @@ def simulate_noise(control):
     for k in range(0,n_simulations):
 
         #--- Open file to store time-series
-        datafile = label + '_' + str(k) + "." + control['file_config'].get('TS_format','mom')
+        datafile = label + '_' + str(k) + "." + time_format
         fname = str(directory.resolve()) + '/' + datafile
-
-        #--- Create deterministic signal
-        y = create_trend(control,t)
 
         #--- Create the synthetic noise
         #y += create_noise_(control,rng)
@@ -120,15 +123,15 @@ def create_noise(
         noiseModels,
         rng=None
     ):
-    """ Toma la lista de los modelos que quiere usar junto con los parametros y isntancia los nuevos modelos desde create_H
+    """ Toma la lista de los modelos que quiere usar junto con los parametros y
+    instancia los nuevos modelos desde create_h
     """
     print("Params de create_noise: ", m, dt, ms, noiseModels, rng)
     sigma = []
     h = []
     for model, params in noiseModels.items():
         ## Dinamycally get and call the function using the model name
-        ## TODO capitalize/or not all function names
-        model_function = getattr(create_hs, f"create_h_{model}")
+        model_function = getattr(create_hs, model)
 
         for i in params.keys():
             ## Cada modelo puede estar mas de una vez
@@ -145,33 +148,8 @@ def create_noise(
     y = np.zeros(m)
 
     for s,ha in zip(sigma,h):
-        # print(s, ha)
         w = s * rng.standard_normal(m+ms)
         y += signal.fftconvolve(ha, w)[0:m]
-
-    return y
-
-def create_trend(control,times,
-                 dsignal_dt=365.25):
-    """
-    dsignal_dt: if signal units are not dt units.
-                by default dt is in units of days and
-                trends are expressed in units of years
-                also periodic signals are expressed in
-                units of years
-    """
-    bias = control['general'].get('NominalBias',0)
-    trend = control['general'].get('Trend',0)
-    annualAmplitude = control['general'].get('AnnualSignal',0)
-
-    if not isinstance(times,np.ndarray):
-        times = np.array(times)
-
-    y = bias + trend * (times - times[0])/dsignal_dt
-
-    if abs(annualAmplitude) > 0:
-        y += annualAmplitude * np.cos(2*np.pi*(times - times[0])/dsignal_dt)
-        # TODO: why does the annual signal have to start alongside the noise?
 
     return y
 
