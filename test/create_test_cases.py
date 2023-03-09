@@ -48,6 +48,13 @@ def main(n):
 
             # Agregamos las opciones generales de configuración que hector
             # Si o Si necesita.
+
+            # Redondeamos el intervalo de tiempo para evitar
+            # errores de redondeo que después molesten a los test_cases.
+            dt = data['NoiseModels'][model][l]['dt']
+            dt = float(np.round(dt,5)) # a toml no le gustan numpy.float64
+            data['NoiseModels'][model][l]['dt'] = dt
+
             data['general'] = {}
             data['file_config'] = {}
             data['general']['NumberOfSimulations'] = 1
