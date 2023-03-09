@@ -93,7 +93,7 @@ def simulate_noise(control):
 
         #--- Create the synthetic noise
         #y += create_noise_(control,rng)
-        y += create_noise(m,dt,ms,noiseModels,rng)
+        y = create_noise(m,dt,ms,noiseModels,rng)
 
         #--- TODO: not always write mom files
         momwrite(y,t,dt,fname)
