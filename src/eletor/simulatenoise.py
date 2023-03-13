@@ -41,6 +41,10 @@ from eletor.helper import mactrick
 #===============================================================================
 
 def simulate_noise(control):
+    """
+    El objetivo de esta función ahora es simplemente hacer el unpack
+    de las opciones generales.
+    """
 
     #--- Some variables that define the runs
     ## Unpack all variables from the control object
@@ -52,7 +56,6 @@ def simulate_noise(control):
 
     repeatablenoise = control['general'].get('RepeatableNoise',False)
     deterministic_noise = control['general'].get('DeterministicNoise',False)
-    time_format = control['file_config'].get('TS_format','mom')
 
     #--- Start the clock!
     start_time = time.time()
@@ -176,42 +179,12 @@ def main():
 
     simulaciones = simulate_noise(control)
 
-
-    # -------------------
-    #  Ahora la salida.
-    #  Por ahora dejamos la opcion de sacar a mom para hacer
-    #  alguna prueba.
-    # -------------------
-
-    # En realidad todo lo que es file_config deberian ser opciones
-    # del programa directamente
-    formato       = control['file_config'].get("FileFormat",'print')
-    if formato == 'print':
-        # Esto no sirve para nada, pero es para que el programa haga algo en
-        # caso de que no se pida que escriba.
-        print(simulaciones)
-
-    elif formato == 'mom':
-        # Por política no quiero depender de compat salvo que sea estrictamente
-        # necesario. Por eso importo esta función recién acá.
-        from eletor.compat import vector_to_mom
-
-        # En realidad todo lo que es file_config deberian ser opciones
-        # del programa directamente
-        directory     = Path(control['file_config'].get("SimulationDir",''))
-        label         = control['file_config'].get("SimulationLabel",'')
-        # Es casi inevitable acceder acá a control porque el mom
-        # pone en el encabezado este dato.
-        dt            = control['general'].get("SamplingPeriod")
-
-        for i,sim in enumerate(simulaciones):
-            fname = directory / f'{label}_{i}.mom'
-
-            with open(fname,'w') as fp:
-                print('--> {0:s}'.format(fname))
-                #--- Formatear los datos igual que hector
-                vector_to_mom(y=y,sampling_period=dt)
-                fp.writelines(datalines)
+    for simulacion in simulaciones:
+        print( '\n'.join(
+            map('{:.3f}'.format,
+                simulacion)
+                        )
+              )
 
 if __name__ == "__main__":
     exit(main())
