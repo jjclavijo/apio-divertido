@@ -33,7 +33,6 @@ from scipy.special import kv
 
 #from eletor.control import Control, parse_retro_ctl
 #from eletor.observations import Observations, momwrite
-from eletor.compat import momwrite
 
 from eletor import create_hs
 from eletor.helper import mactrick
@@ -42,11 +41,13 @@ from eletor.helper import mactrick
 #===============================================================================
 
 def simulate_noise(control):
+    """
+    El objetivo de esta función ahora es simplemente hacer el unpack
+    de las opciones generales.
+    """
 
     #--- Some variables that define the runs
     ## Unpack all variables from the control object
-    directory     = Path(control['file_config'].get("SimulationDir",''))
-    label         = control['file_config'].get("SimulationLabel",'')
     n_simulations = control['general'].get("NumberOfSimulations",1)
     m             = control['general'].get("NumberOfPoints")
     dt            = control['general'].get("SamplingPeriod")
@@ -55,7 +56,6 @@ def simulate_noise(control):
 
     repeatablenoise = control['general'].get('RepeatableNoise',False)
     deterministic_noise = control['general'].get('DeterministicNoise',False)
-    time_format = control['file_config'].get('TS_format','mom')
 
     #--- Start the clock!
     start_time = time.time()
@@ -67,39 +67,23 @@ def simulate_noise(control):
     if deterministic_noise:
         from eletor.not_rng import rng
 
-    #--- Does the directory exists?
-    if not os.path.exists(directory):
-       os.makedirs(directory)
-
-    #--- Create time array. Default time format is mom
-    # Dejo el if-else para que nos acordemos que esto tiene que
-    # Cambiar.
-    if time_format == 'mom':
-        t0 = 51544.0
-        t = np.linspace(t0,t0+m*dt,m,endpoint=False)
-    else:
-        raise NotImplementedError
-
-    # En algún momento a alguien le pareció útil pensar que el índice de
-    # tiempos había que tener la posibilidad de leerlo de un archivo de datos.
-    # No veo que tenga mucho sentido ahora, pero lo anoto.
+    #--- TODO: antes en esta parte se trataban los tiempos.
+    # Por ahora no estamos implementando un índice de tiempo
+    # durante la simulación. El indice que hector generaba
+    # era puramente pensado para la salida en formato .mom
+    # así que pasó a compat.
 
     #--- Run all simulations
+    simulaciones = []
     for k in range(0,n_simulations):
 
-        #--- Open file to store time-series
-        datafile = label + '_' + str(k) + "." + time_format
-        fname = str(directory.resolve()) + '/' + datafile
-
-        #--- Create the synthetic noise
-        #y += create_noise_(control,rng)
         y = create_noise(m,dt,ms,noiseModels,rng)
-
-        #--- TODO: not always write mom files
-        momwrite(y,t,dt,fname)
+        simulaciones.append(y)
 
     #--- Show time lapsed
     print("--- {0:8.3f} seconds ---\n".format(float(time.time() - start_time)))
+
+    return simulaciones
 
 #===============================================================================
 # Signal Creation Functions
@@ -193,7 +177,14 @@ def main():
         print(f'Invalid file specification: {fname}')
         return 2 # Exit with errorcode 2: file not found
 
-    simulate_noise(control)
+    simulaciones = simulate_noise(control)
+
+    for simulacion in simulaciones:
+        print( '\n'.join(
+            map('{:.3f}'.format,
+                simulacion)
+                        )
+              )
 
 if __name__ == "__main__":
     exit(main())

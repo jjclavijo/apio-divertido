@@ -608,7 +608,7 @@ def toml_to_ctl_cli(fname,dirname=None):
 
     return 0
 
-def momwrite(y,ix,sampling_period,fname):
+def vector_to_mom(*,y,ix=None,sampling_period=None):
     """
     Escribir los datos <y> con el índice <ix> en un archivo de nombre <fname>
     con el formato de archivo que usa hector (.mom).
@@ -617,22 +617,29 @@ def momwrite(y,ix,sampling_period,fname):
     encabezado.
     """
 
+    if ix is None:
+        if sampling_period is None:
+            raise ValueError('Must pass one of ix|sampling_period')
+        else:
+            t0 = 51544.0
+            ix = [t0+m*sampling_period for m in range(len(y))]
+    else:
+        # Asumimos sampling_period regular.
+        # esto es todo herencia asi que no nos vamos a poner puristas
+        sampling_period = ix[1]-ix[0]
+
     # generar las líneas sin formatear, eliminando las que sean nan.
     data = [(i,d) for i,d in zip(ix,y) if not isnan(d)]
 
-    formatter='{:12.6f} {:13.6f}\n'.format
+    datalines = ['# sampling period {0:f}\n'.format(sampling_period)]
+
+    # El tipo de cosas que le gustan a Gonzalo
+    formatter=lambda x:'{:12.6f} {:13.6f}\n'.format(*x)
 
     # formatear líneas.
-    datalines = [formatter(*d) for d in data]
+    datalines.extend(map(formatter, data))
 
-    with open(fname,'w') as fp:
-        print('--> {0:s}'.format(fname))
-
-        #--- Write header
-        fp.write('# sampling period {0:f}\n'.format(sampling_period))
-
-        #--- Formatear los datos igual que hector
-        fp.writelines(datalines)
+    return datalines
 
 """
 Usage: python -m eletor.control [-I] <file1> <file2> ....
