@@ -249,43 +249,26 @@ def test_samples_not_normal(model):
     create_noise function just returns whit noise
     """
 
-    pvalues = []
+    parameter_fun = getattr(eletor.parameter_generation,
+                    model.lower())
 
-    # Deterministico, pero partimos de un ruido
-    # para los test no sea demasiado poco NORMAL.
-    pvalue0 = 0
-    while pvalue0 < 0.90:
-        ruido = np.random.randn(100)
-        _, pvalue0 = normaltest(ruido)
+    parameters = parameter_fun('1',sigma=1,m=1000,dt=1)
 
-    rng = lambda x: ruido
-    rng.standard_normal = rng
+    y = hps.create_noise(
+            1000,
+            10,
+            0,
+            parameters['NoiseModels'],
+            rng=None)
 
-    # Se hacen dos corridas porque para algunos parámetros el
-    # proceso casi no se altera,
-    # Podríamos evitando tuneando o fijando los parámetros.
-    # Puede que eso esté out of the scope para esta etapa.
-    pvalue = pvalue0
-    for i in range(2):
-        parameter_fun = getattr(eletor.parameter_generation,
-                        model.lower())
-        parameters = parameter_fun('1',sigma=1,m=100,dt=5)
-
-        y = hps.create_noise(
-                100,
-                10,
-                0,
-                parameters['NoiseModels'],
-                rng=rng)
-
-        _, pvalue_ = normaltest(y-ruido)
-        if pvalue_ < pvalue:
-            pvalue = pvalue_
+    corr = np.correlate(y[:100],y)
 
     if model == 'White':
-        assert True # We already tested this case
+        # White spectrum is not monotonous
+        assert not all(corr[1:] <= corr [:-1])
+        assert not all(corr[1:] >= corr [:-1])
     else:
         # Aplicar un modelo de ruido no blanco tiene que bajar sensiblemente el
         # p_valor del test de normalidad.
-        assert ( pvalue0 - pvalue ) > 0.1
+        assert np.count_nonzero(corr[2:] <= corr [:-2])
 
