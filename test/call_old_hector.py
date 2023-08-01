@@ -85,9 +85,13 @@ def call_hector_with_toml(data_or_file,return_type='file'):
             with open(file,'br') as f:
                 md5 = hashlib.md5()
                 md5.update(f.read())
+            with open(file,'r') as f:
+                _ = f.readline()
+                raw_mom = [i.split()[-1] for i in f.readlines()]
             key = [*data['NoiseModels'].keys()][0]
             label = [*data['NoiseModels'][key].keys()][0]
             data['NoiseModels'][key][label]['md5'] = md5.hexdigest()
+            data['NoiseModels'][key][label]['mom'] = raw_mom
             return data
 
 @click.command

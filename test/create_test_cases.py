@@ -27,7 +27,7 @@ def create_model_data(n,model):
         # Se cambia la etiqueta con que cada modelo se genera para que en el
         # toml no se pisen las etiquetas.
         label = f'{i}'
-        yield label,model_fun(label)
+        yield label,model_fun(label,m=20)
 
 
 def main(n):
@@ -95,4 +95,4 @@ if __name__ == "__main__":
     # La semilla del generador y el número de ejemplos a generar esta
     # hardcodeado aunque podría no estarlo.
     np.random.seed(0)
-    exit(main(10))
+    exit(main(3))

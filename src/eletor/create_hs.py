@@ -24,7 +24,7 @@ def White(
     #--- Array to fill impulse response
     h = np.zeros(m)
 
-    h[0] = sigma
+    h[0] = 1 #sigma
 
     return sigma, h
 
